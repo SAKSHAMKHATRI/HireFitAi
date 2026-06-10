@@ -27,7 +27,7 @@ export default function RecruiterPage() {
 
     setLoading(true)
     try {
-      // Use browser-safe base64 encoding
+      // Browser-safe base64 encoding
       const encodedText = btoa(encodeURIComponent(resumeText).replace(/%([0-9A-F]{2})/g, (match, p1) => {
         return String.fromCharCode(parseInt(p1, 16));
       }));
@@ -170,7 +170,7 @@ export default function RecruiterPage() {
             <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-white/5 rounded-2xl opacity-50">
               <UserCheck className="h-16 w-16 text-muted-foreground mb-6" strokeWidth={0.5} />
               <h3 className="text-xl font-headline font-medium mb-2">Simulate a Recruiter</h3>
-              <p className="text-sm text-muted-foreground max-sm">
+              <p className="text-sm text-muted-foreground max-w-xs">
                 Understand exactly how a hiring manager or recruiter perceives your resume at first glance.
               </p>
             </div>
