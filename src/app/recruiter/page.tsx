@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from "react"
@@ -28,8 +27,10 @@ export default function RecruiterPage() {
 
     setLoading(true)
     try {
-      // Use browser-safe base64 encoding instead of Node.js Buffer
-      const encodedText = btoa(unescape(encodeURIComponent(resumeText)));
+      // Use browser-safe base64 encoding instead of Node.js Buffer to avoid 'Buffer is not defined' errors
+      const encodedText = btoa(encodeURIComponent(resumeText).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+        return String.fromCharCode(parseInt(p1, 16));
+      }));
       const resumeDataUri = `data:text/plain;base64,${encodedText}`
 
       const output = await recruiterShortlistProbability({

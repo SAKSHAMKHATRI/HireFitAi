@@ -1,3 +1,5 @@
-
-// This file is disabled to resolve the parallel route conflict with src/app/evaluator/page.tsx
-// Please use the root src/app/evaluator/page.tsx instead.
+/**
+ * This file is deactivated to resolve a parallel route conflict with src/app/evaluator/page.tsx.
+ * In Next.js, two files cannot resolve to the same path (/evaluator).
+ */
+export {};
