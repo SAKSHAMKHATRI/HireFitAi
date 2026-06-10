@@ -1,4 +1,13 @@
-// This file is neutralized to prevent layout nesting conflicts.
-export default function NeutralizedLayout({ children }: { children: React.ReactNode }) {
+import React from 'react';
+
+/**
+ * Dashboard layout group wrapper.
+ * This layout is nested within the root layout.
+ */
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return <>{children}</>;
 }
