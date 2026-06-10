@@ -170,7 +170,7 @@ export default function RecruiterPage() {
             <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-white/5 rounded-2xl opacity-50">
               <UserCheck className="h-16 w-16 text-muted-foreground mb-6" strokeWidth={0.5} />
               <h3 className="text-xl font-headline font-medium mb-2">Simulate a Recruiter</h3>
-              <p className="text-sm text-muted-foreground max-w-sm">
+              <p className="text-sm text-muted-foreground max-sm">
                 Understand exactly how a hiring manager or recruiter perceives your resume at first glance.
               </p>
             </div>
