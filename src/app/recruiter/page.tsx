@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -27,7 +28,7 @@ export default function RecruiterPage() {
 
     setLoading(true)
     try {
-      // Browser-compatible base64 encoding (replaces Node.js Buffer)
+      // Use browser-safe base64 encoding instead of Node.js Buffer
       const encodedText = btoa(unescape(encodeURIComponent(resumeText)));
       const resumeDataUri = `data:text/plain;base64,${encodedText}`
 
