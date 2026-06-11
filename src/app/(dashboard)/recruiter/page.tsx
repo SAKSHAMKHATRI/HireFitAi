@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -27,10 +28,10 @@ export default function RecruiterPage() {
 
     setLoading(true)
     try {
-      // Browser-safe base64 encoding
-      const encodedText = btoa(encodeURIComponent(resumeText).replace(/%([0-9A-F]{2})/g, (match, p1) => {
-        return String.fromCharCode(parseInt(p1, 16));
-      }));
+      // Browser-safe base64 encoding using TextEncoder for Unicode safety
+      const bytes = new TextEncoder().encode(resumeText);
+      const binString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
+      const encodedText = btoa(binString);
       const resumeDataUri = `data:text/plain;base64,${encodedText}`
 
       const output = await recruiterShortlistProbability({
@@ -148,23 +149,6 @@ export default function RecruiterPage() {
                   </div>
                 </CardContent>
               </Card>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 flex items-start gap-3">
-                  <BarChart className="h-5 w-5 text-blue-400 shrink-0" strokeWidth={1.5} />
-                  <div>
-                    <h5 className="text-xs font-headline uppercase text-blue-400 mb-1">Market Benchmark</h5>
-                    <p className="text-xs">Your profile aligns with top-tier candidates currently interviewing for similar roles.</p>
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-yellow-400 shrink-0" strokeWidth={1.5} />
-                  <div>
-                    <h5 className="text-xs font-headline uppercase text-yellow-400 mb-1">Key Decision Factor</h5>
-                    <p className="text-xs">Domain expertise in cloud infrastructure is the strongest conversion point.</p>
-                  </div>
-                </div>
-              </div>
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-white/5 rounded-2xl opacity-50">

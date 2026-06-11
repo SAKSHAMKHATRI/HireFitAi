@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -144,17 +145,6 @@ export default function EvaluatorPage() {
                   </h4>
                   <div className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
                     {result.reasoning}
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg border border-white/5 bg-white/[0.01]">
-                    <p className="text-[10px] uppercase text-muted-foreground mb-1">Status</p>
-                    <p className="text-sm font-medium">{result.matchScore >= 80 ? "Highly Compatible" : result.matchScore >= 60 ? "Moderate Match" : "Significant Gaps"}</p>
-                  </div>
-                  <div className="p-3 rounded-lg border border-white/5 bg-white/[0.01]">
-                    <p className="text-[10px] uppercase text-muted-foreground mb-1">Recruitability</p>
-                    <p className="text-sm font-medium">{result.matchScore >= 75 ? "Direct Referral" : "Review Required"}</p>
                   </div>
                 </div>
               </CardContent>

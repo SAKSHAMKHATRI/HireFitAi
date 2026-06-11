@@ -1,15 +1,16 @@
+
 "use client"
 
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { 
   ShieldCheck, 
-  BarChart3, 
   Target, 
   Search, 
   Activity, 
   Layers, 
   Cpu, 
-  TrendingUp 
+  TrendingUp,
+  BarChart3
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -23,13 +24,12 @@ export default function Dashboard() {
         <p className="text-muted-foreground text-lg">Real-time analysis of your professional profile ecosystem.</p>
       </div>
 
-      <div className="bento-grid">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Application Readiness"
           value="84/100"
           description="Across 12 targeted roles"
           icon={ShieldCheck}
-          className="col-span-2 lg:col-span-1"
           trend={{ value: "+4.2%", positive: true }}
         />
         <MetricCard
@@ -53,8 +53,10 @@ export default function Dashboard() {
           icon={Activity}
           trend={{ value: "-0.5%", positive: false }}
         />
+      </div>
 
-        <Card className="col-span-2 lg:col-span-3 glass-card">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <Card className="lg:col-span-3 glass-card">
           <CardHeader>
             <CardTitle className="font-headline">Resume Health Dashboard</CardTitle>
             <CardDescription>Visualizing your core performance metrics across industry cohorts.</CardDescription>
@@ -94,7 +96,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-2 lg:col-span-1 glass-card">
+        <Card className="lg:col-span-1 glass-card">
           <CardHeader>
             <CardTitle className="font-headline text-lg">Quick Actions</CardTitle>
           </CardHeader>

@@ -1,2 +1,5 @@
-// This file is intentionally left empty to resolve a routing conflict with src/app/(dashboard)/optimizer/page.tsx.
-export default function NeutralizedOptimizerPage() { return null; }
+
+/**
+ * Route neutralized to avoid conflict with src/app/(dashboard)/optimizer/page.tsx
+ */
+export const dynamic = 'force-static';
