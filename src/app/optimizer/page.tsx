@@ -1,5 +1,2 @@
-/**
- * Route Conflict Resolution:
- * This file is deactivated to allow src/app/(dashboard)/optimizer/page.tsx to serve as the primary route handler for /optimizer.
- */
-export const dynamic = 'force-static';
+// This file is deactivated to resolve route conflicts with src/app/(dashboard)/optimizer/page.tsx
+export {};
