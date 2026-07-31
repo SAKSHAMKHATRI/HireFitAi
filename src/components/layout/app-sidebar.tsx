@@ -12,7 +12,8 @@ import {
   FileCode,
   Download,
   Terminal,
-  BrainCircuit
+  BrainCircuit,
+  Target
 } from "lucide-react"
 
 import {
@@ -41,6 +42,11 @@ const data = {
       title: "Resume Analyzer",
       url: "/analyzer",
       icon: FileText,
+    },
+    {
+      title: "AI Match",
+      url: "/match",
+      icon: Target,
     },
     {
       title: "H.I.R.E Evaluator",
