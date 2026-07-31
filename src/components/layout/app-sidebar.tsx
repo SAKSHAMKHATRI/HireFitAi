@@ -31,16 +31,16 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 const data = {
-  user: {
-    name: "John Doe",
-    email: "john@hirefit.ai",
-    avatar: "https://picsum.photos/seed/jd1/200/200",
-  },
   navMain: [
     {
       title: "Command Center",
-      url: "/",
+      url: "/dashboard",
       icon: LayoutDashboard,
+    },
+    {
+      title: "Resume Analyzer",
+      url: "/analyzer",
+      icon: FileText,
     },
     {
       title: "H.I.R.E Evaluator",
@@ -59,25 +59,25 @@ const data = {
     },
     {
       title: "Career Coach",
-      url: "/coach",
       icon: GraduationCap,
+      comingSoon: true,
     },
   ],
   secondary: [
     {
       title: "Version History",
-      url: "/versions",
       icon: History,
+      comingSoon: true,
     },
     {
       title: "Tailored Letters",
-      url: "/cover-letters",
       icon: FileCode,
+      comingSoon: true,
     },
     {
       title: "Export Reports",
-      url: "/export",
       icon: Download,
+      comingSoon: true,
     },
   ],
 }
@@ -91,13 +91,13 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/">
+                  <Link href="/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <Terminal className="size-4" strokeWidth={1.5} />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-headline font-semibold text-lg">HIREFIT AI</span>
-                  <span className="truncate text-xs text-muted-foreground uppercase tracking-widest">Enterprise v2.0</span>
+                  <span className="truncate text-xs text-muted-foreground uppercase tracking-widest">Career Suite v2.0</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -110,12 +110,20 @@ export function AppSidebar() {
           <SidebarMenu>
             {data.navMain.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
-                  <Link href={item.url}>
+                {item.comingSoon ? (
+                  <SidebarMenuButton aria-disabled="true" tabIndex={-1} onClick={(event) => event.preventDefault()} tooltip="Coming Soon" title={`${item.title} — Coming Soon`} className="cursor-not-allowed opacity-50">
                     <item.icon className="size-4" strokeWidth={1.5} />
                     <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
+                    <span className="ml-auto text-[9px] uppercase tracking-wider group-data-[collapsible=icon]:hidden">Soon</span>
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
+                    <Link href={item.url!}>
+                      <item.icon className="size-4" strokeWidth={1.5} />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                )}
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -125,11 +133,10 @@ export function AppSidebar() {
           <SidebarMenu>
             {data.secondary.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
-                  <Link href={item.url}>
-                    <item.icon className="size-4" strokeWidth={1.5} />
-                    <span>{item.title}</span>
-                  </Link>
+                <SidebarMenuButton aria-disabled="true" tabIndex={-1} onClick={(event) => event.preventDefault()} tooltip="Coming Soon" title={`${item.title} — Coming Soon`} className="cursor-not-allowed opacity-50">
+                  <item.icon className="size-4" strokeWidth={1.5} />
+                  <span>{item.title}</span>
+                  <span className="ml-auto text-[9px] uppercase tracking-wider group-data-[collapsible=icon]:hidden">Soon</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
@@ -137,7 +144,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   )

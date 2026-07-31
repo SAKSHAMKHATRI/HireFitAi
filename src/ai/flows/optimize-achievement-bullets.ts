@@ -40,7 +40,13 @@ const prompt = ai.definePrompt({
   output: {schema: OptimizeAchievementBulletsOutputSchema},
   prompt: `You are an expert resume writer and career coach.
 Your task is to transform the provided passive resume bullet points into high-impact, results-driven achievement statements.
-Focus on using strong action verbs, quantifying achievements with numbers and metrics, and highlighting the impact or benefit of the action.
+Focus on using strong action verbs, clearer structure, and highlighting the impact or benefit of the action.
+
+IMPORTANT:
+Never invent metrics, percentages, counts, years, revenue, user numbers, rankings, achievements, experience, certifications, tools, clients, awards, or measurable results.
+If the user's input does not contain measurable values, rewrite the bullet professionally without fabricating statistics.
+Only preserve or improve metrics and facts that already exist in the user's original input.
+If additional impact cannot be verified, improve wording only.
 
 Here are the bullet points to optimize:
 {{#each bulletPoints}}

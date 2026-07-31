@@ -11,11 +11,15 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
+        display: ['var(--font-display)', 'Outfit', 'sans-serif'],
         body: ['Inter', 'sans-serif'],
-        headline: ['Space Grotesk', 'sans-serif'],
+        headline: ['Outfit', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
+        'brand-green': 'var(--color-brand-green)',
+        'bg-base': 'var(--color-bg-base)',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
