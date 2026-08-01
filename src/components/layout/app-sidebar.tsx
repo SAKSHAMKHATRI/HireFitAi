@@ -13,7 +13,9 @@ import {
   Download,
   Terminal,
   BrainCircuit,
-  Target
+  Target,
+  Mic2,
+  Map
 } from "lucide-react"
 
 import {
@@ -64,9 +66,19 @@ const data = {
       icon: Zap,
     },
     {
+      title: "AI Interview",
+      url: "/interview",
+      icon: Mic2,
+    },
+    {
+      title: "Career Roadmap",
+      url: "/roadmap",
+      icon: Map,
+    },
+    {
       title: "Career Coach",
+      url: "/coach",
       icon: GraduationCap,
-      comingSoon: true,
     },
   ],
   secondary: [
@@ -116,20 +128,12 @@ export function AppSidebar() {
           <SidebarMenu>
             {data.navMain.map((item) => (
               <SidebarMenuItem key={item.title}>
-                {item.comingSoon ? (
-                  <SidebarMenuButton aria-disabled="true" tabIndex={-1} onClick={(event) => event.preventDefault()} tooltip="Coming Soon" title={`${item.title} — Coming Soon`} className="cursor-not-allowed opacity-50">
+                <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
+                  <Link href={item.url}>
                     <item.icon className="size-4" strokeWidth={1.5} />
                     <span>{item.title}</span>
-                    <span className="ml-auto text-[9px] uppercase tracking-wider group-data-[collapsible=icon]:hidden">Soon</span>
-                  </SidebarMenuButton>
-                ) : (
-                  <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
-                    <Link href={item.url!}>
-                      <item.icon className="size-4" strokeWidth={1.5} />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                )}
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
