@@ -15,7 +15,7 @@ import {
   BrainCircuit,
   Target,
   Mic2,
-  Map
+  Map,
 } from "lucide-react"
 
 import {
@@ -80,16 +80,16 @@ const data = {
       url: "/coach",
       icon: GraduationCap,
     },
+    {
+      title: "Cover Letter",
+      url: "/cover-letter",
+      icon: FileCode,
+    },
   ],
   secondary: [
     {
       title: "Version History",
       icon: History,
-      comingSoon: true,
-    },
-    {
-      title: "Tailored Letters",
-      icon: FileCode,
       comingSoon: true,
     },
     {
