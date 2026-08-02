@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BrainCircuit, Loader2, Sparkles, CheckCircle2 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { recordActivity } from "@/lib/analytics"
 
 export default function EvaluatorPage() {
   const [resume, setResume] = useState("")
@@ -31,6 +32,11 @@ export default function EvaluatorPage() {
         jobDescriptionText: jobDescription
       })
       setResult(output)
+      recordActivity({
+        type: "hireEvaluated",
+        timestamp: Date.now(),
+        matchScore: output.matchScore,
+      })
     } catch (error) {
       toast({
         title: "Evaluation failed",

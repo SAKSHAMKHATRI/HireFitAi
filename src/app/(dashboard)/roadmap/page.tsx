@@ -36,6 +36,8 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import { recordActivity } from "@/lib/analytics"
+import { loadSettings } from "@/lib/settings"
 import { friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
 const generationTimeoutMs = 120000
@@ -194,6 +196,11 @@ export default function RoadmapPage() {
   const [report, setReport] = useState<GenerateCareerRoadmapOutput | null>(null)
   const [checkedMilestones, setCheckedMilestones] = useState<Record<number, boolean>>({})
 
+  // Start from the time commitment configured in Settings (hydration-safe).
+  useEffect(() => {
+    setSetup((current) => ({ ...current, timeCommitment: loadSettings().roadmapTimeCommitment }))
+  }, [])
+
   // Inject print-only styles so "Download PDF" prints just the roadmap report.
   useEffect(() => {
     if (phase !== "report") return
@@ -248,6 +255,17 @@ export default function RoadmapPage() {
       setCheckedMilestones({})
       setProgress(100)
       setPhase("report")
+      recordActivity({
+        type: "roadmapGenerated",
+        timestamp: Date.now(),
+        estimatedReadiness: output.estimatedReadiness,
+        targetCareer: active.targetCareer,
+        skillGap: output.skillGap.map((item) => ({
+          skill: item.skill,
+          currentLevel: item.currentLevel,
+          requiredLevel: item.requiredLevel,
+        })),
+      })
     } catch (generationError) {
       window.clearInterval(progressTimer)
       setProgress(0)

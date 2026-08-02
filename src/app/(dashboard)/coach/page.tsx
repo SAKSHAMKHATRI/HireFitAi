@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import { recordActivity } from "@/lib/analytics"
 import { friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
 const chatTimeoutMs = 120000
@@ -254,6 +255,11 @@ export default function CareerCoachPage() {
           "The Career Coach took too long to respond. Please try again."
         )
         setMessages((current) => [...current, { role: "assistant", content: output.reply }])
+        recordActivity({
+          type: "coachConversation",
+          timestamp: Date.now(),
+          userMessages: messages.filter((message) => message.role === "user").length + 1,
+        })
       } catch (sendError) {
         setError(friendlyErrorMessage(sendError, "The Career Coach could not respond. Please try again."))
       } finally {
@@ -286,6 +292,11 @@ export default function CareerCoachPage() {
         "The Career Coach took too long to respond. Please try again."
       )
       setMessages((current) => [...current, { role: "assistant", content: output.reply }])
+      recordActivity({
+        type: "coachConversation",
+        timestamp: Date.now(),
+        userMessages: prior.filter((message) => message.role === "user").length + 1,
+      })
     } catch (regenerateError) {
       setError(friendlyErrorMessage(regenerateError, "Could not regenerate the answer. Please try again."))
     } finally {
@@ -303,6 +314,20 @@ export default function CareerCoachPage() {
   useEffect(() => {
     if (historyLoaded) saveHistory(messages)
   }, [messages, historyLoaded])
+
+  // Deep-link support: the landing page career assistant routes here with ?q=<question>.
+  const autoSendRef = useRef(false)
+  useEffect(() => {
+    if (!historyLoaded || autoSendRef.current) return
+    const params = new URLSearchParams(window.location.search)
+    const question = params.get("q")
+    if (question && question.trim()) {
+      autoSendRef.current = true
+      window.history.replaceState(null, "", window.location.pathname)
+      setInput(question.trim())
+      sendMessage(question.trim())
+    }
+  }, [historyLoaded, sendMessage])
 
   const availableContextCount = useMemo(
     () => contextSources.filter((source) => Boolean(smartContext[source.key])).length,

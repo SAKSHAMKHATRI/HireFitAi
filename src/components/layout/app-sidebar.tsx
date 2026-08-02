@@ -89,13 +89,13 @@ const data = {
   secondary: [
     {
       title: "Version History",
+      url: "/version-history",
       icon: History,
-      comingSoon: true,
     },
     {
       title: "Export Reports",
+      url: "/export-reports",
       icon: Download,
-      comingSoon: true,
     },
   ],
 }
@@ -143,10 +143,11 @@ export function AppSidebar() {
           <SidebarMenu>
             {data.secondary.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton aria-disabled="true" tabIndex={-1} onClick={(event) => event.preventDefault()} tooltip="Coming Soon" title={`${item.title} — Coming Soon`} className="cursor-not-allowed opacity-50">
-                  <item.icon className="size-4" strokeWidth={1.5} />
-                  <span>{item.title}</span>
-                  <span className="ml-auto text-[9px] uppercase tracking-wider group-data-[collapsible=icon]:hidden">Soon</span>
+                <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
+                  <Link href={item.url}>
+                    <item.icon className="size-4" strokeWidth={1.5} />
+                    <span>{item.title}</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}

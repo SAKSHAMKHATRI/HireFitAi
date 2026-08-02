@@ -1,9 +1,18 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { motion } from "motion/react"
+import { useState, type FormEvent } from "react"
 import { LandingSections } from "@/components/LandingSections"
 import { useAuth } from "@/components/auth/auth-provider"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 const videoUrl =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260603_132049_036591b8-6e92-4760-b94c-a7ea6eef315c.mp4"
@@ -40,8 +49,23 @@ function InsightCard({ title, value, className, delay }: { title: string; value:
 }
 
 export function Hero() {
-  const { isAuthenticated } = useAuth()
+  const router = useRouter()
+  const { isAuthenticated, requireAuth } = useAuth()
+  const [question, setQuestion] = useState("")
+  const [demoOpen, setDemoOpen] = useState(false)
   const dashboardHref = isAuthenticated ? "/dashboard" : "/login?next=%2Fdashboard"
+
+  const askAssistant = (event?: FormEvent) => {
+    event?.preventDefault()
+    const questionText = question.trim()
+    if (!questionText) return
+    const href = `/coach?q=${encodeURIComponent(questionText)}`
+    if (isAuthenticated) {
+      router.push(href)
+    } else {
+      requireAuth(href)
+    }
+  }
 
   return (
     <>
@@ -85,24 +109,39 @@ export function Hero() {
                 <Link href={dashboardHref} className="rounded-full bg-brand-green px-6 py-3 text-sm font-semibold text-black shadow-[0_18px_45px_rgba(106,154,0,0.35)] transition-transform hover:-translate-y-0.5">
                   Analyze Resume →
                 </Link>
-                <a href="#product-showcase" className="rounded-full border border-black/10 bg-white/90 px-6 py-3 text-sm font-medium text-zinc-900 shadow-sm backdrop-blur-xl transition-transform hover:-translate-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDemoOpen(true)}
+                  className="rounded-full border border-black/10 bg-white/90 px-6 py-3 text-sm font-medium text-zinc-900 shadow-sm backdrop-blur-xl transition-transform hover:-translate-y-0.5"
+                >
                   Watch Demo
-                </a>
+                </button>
                 <span className="w-full text-sm font-medium text-zinc-700 sm:w-auto">✓ No Credit Card Required</span>
               </div>
 
-              <div className="bg-white rounded-[6px] border border-black/[0.05] p-1 pl-4 flex items-center shadow-sm w-full max-w-xl">
+              <form
+                onSubmit={askAssistant}
+                className="bg-white rounded-[6px] border border-black/[0.05] p-1 pl-4 flex items-center shadow-sm w-full max-w-xl"
+              >
                 <input
-                  placeholder="Upload your resume or ask a career question..."
-                  disabled
-                  aria-label="Career assistant coming soon"
-                  className="h-9 min-w-0 flex-1 cursor-not-allowed bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 disabled:opacity-100"
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  placeholder="Ask your career question or upload a resume..."
+                  aria-label="Ask your career question"
+                  className="h-9 min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400"
                 />
-                <span className="mr-2 shrink-0 rounded-full bg-brand-green/25 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-zinc-800">Coming Soon</span>
-                <button disabled className="bg-[#1a1a1a] text-white w-9 h-9 rounded-full relative cursor-not-allowed" aria-label="Career assistant coming soon">
+                <button
+                  type="submit"
+                  disabled={!question.trim()}
+                  aria-label="Ask the career assistant"
+                  className="bg-[#1a1a1a] text-white w-9 h-9 rounded-full relative shrink-0 transition-opacity hover:opacity-85 disabled:opacity-40"
+                >
                   <ArrowIcon />
                 </button>
-              </div>
+              </form>
+              <p className="text-xs text-zinc-500">
+                Your question opens the HireFit Career Coach, which answers only from your real data.
+              </p>
             </motion.div>
           </div>
         </div>
@@ -113,6 +152,23 @@ export function Hero() {
         <div className="absolute bottom-6 left-8 md:left-12 z-10 text-xs font-medium tracking-wide text-zinc-700">HireFit AI · 2026</div>
         <div className="absolute bottom-6 right-8 md:right-12 z-10 text-xs font-medium tracking-wide text-zinc-700">AI career intelligence</div>
       </section>
+
+      <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
+        <DialogContent className="border border-black/10 bg-[#EDEEF5] text-zinc-950 sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-semibold">HireFit AI in action</DialogTitle>
+            <DialogDescription className="text-zinc-600">
+              A quick look at the HireFit AI experience — from resume analysis to interview prep.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-hidden rounded-2xl border border-black/10 bg-black">
+            <video src={videoUrl} controls autoPlay playsInline className="aspect-video w-full" />
+          </div>
+          <p className="text-center text-xs text-zinc-500">
+            Then sign in to try it yourself — resume analysis, ATS matching, interviews, and more.
+          </p>
+        </DialogContent>
+      </Dialog>
 
       <LandingSections />
     </>

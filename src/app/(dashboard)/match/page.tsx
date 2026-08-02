@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { useResumePdfUpload } from "@/hooks/use-resume-pdf-upload"
+import { recordActivity } from "@/lib/analytics"
 import { fileToDataUri, friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
 const matchTimeoutMs = 60000
@@ -164,6 +165,16 @@ export default function MatchPage() {
         setResult(output)
         setProgress(100)
         setStatus("complete")
+        recordActivity({
+          type: "jobMatched",
+          timestamp: Date.now(),
+          matchScore: output.matchScore,
+          atsCompatibility: output.atsCompatibility,
+          matchedSkills: output.matchedSkills,
+          missingSkills: output.missingSkills,
+          matchedKeywords: output.matchedKeywords,
+          missingKeywords: output.missingKeywords,
+        })
       } catch (matchError) {
         window.clearInterval(progressTimer)
         throw matchError

@@ -40,8 +40,14 @@ function Hamburger({ open }: { open: boolean }) {
 
 export function Navbar() {
   const [open, setOpen] = useState(false)
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, status, signOut } = useAuth()
+  const authenticated = status === "authenticated" && isAuthenticated
   const launchHref = isAuthenticated ? "/dashboard" : "/login?next=%2Fdashboard"
+
+  const handleLogout = () => {
+    setOpen(false)
+    signOut()
+  }
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 py-6 md:py-10 bg-gradient-to-b from-[#f1f1f1]/80 to-transparent backdrop-blur-[2px]">
@@ -60,15 +66,35 @@ export function Navbar() {
         </div>
 
         <div className="col-span-6 md:col-span-3 flex items-center justify-end gap-3">
-          <Link href="/login" className="hidden sm:inline text-[13px] text-zinc-700 hover:text-black">
-            Login
-          </Link>
-          <Link href="/signup" className="hidden lg:inline text-[13px] text-zinc-700 hover:text-black">
-            Sign Up
-          </Link>
-          <Link href={launchHref} className="rounded-full bg-[#1a1a1a] px-4 py-2 text-[13px] font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-transform hover:-translate-y-0.5">
-            Launch HireFit AI →
-          </Link>
+          {status === "loading" ? null : authenticated ? (
+            <>
+              <Link href="/dashboard" className="hidden sm:inline text-[13px] text-zinc-700 hover:text-black">
+                Dashboard
+              </Link>
+              <Link href="/profile" className="hidden sm:inline text-[13px] text-zinc-700 hover:text-black">
+                Profile
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-[13px] font-medium text-zinc-900 transition-colors hover:border-black/25 hover:text-black"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="hidden sm:inline text-[13px] text-zinc-700 hover:text-black">
+                Login
+              </Link>
+              <Link href="/signup" className="hidden lg:inline text-[13px] text-zinc-700 hover:text-black">
+                Sign Up
+              </Link>
+              <Link href={launchHref} className="rounded-full bg-[#1a1a1a] px-4 py-2 text-[13px] font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-transform hover:-translate-y-0.5">
+                Launch HireFit AI →
+              </Link>
+            </>
+          )}
           <button
             type="button"
             aria-label="Toggle navigation"
@@ -91,19 +117,41 @@ export function Navbar() {
             className="md:hidden mx-6 mt-5 rounded-[28px] border border-white/60 bg-white/70 p-4 shadow-2xl shadow-black/10 backdrop-blur-2xl"
           >
             <div className="flex flex-col divide-y divide-black/5">
-              {[...navLinks, "Login", "Sign Up"].map((item) => (
+              {navLinks.map((item) => (
                 <Link
                   key={item}
-                  href={item === "Login" ? "/login" : item === "Sign Up" ? "/signup" : `#${item.toLowerCase().replaceAll(" ", "-")}`}
+                  href={`#${item.toLowerCase().replaceAll(" ", "-")}`}
                   onClick={() => setOpen(false)}
                   className="py-4 text-sm text-zinc-800"
                 >
                   {item}
                 </Link>
               ))}
-              <Link href={launchHref} onClick={() => setOpen(false)} className="py-4 text-sm font-medium text-black">
-                Launch HireFit AI →
-              </Link>
+              {status === "loading" ? null : authenticated ? (
+                <>
+                  <Link href="/dashboard" onClick={() => setOpen(false)} className="py-4 text-sm text-zinc-800">
+                    Dashboard
+                  </Link>
+                  <Link href="/profile" onClick={() => setOpen(false)} className="py-4 text-sm text-zinc-800">
+                    Profile
+                  </Link>
+                  <button type="button" onClick={handleLogout} className="py-4 text-left text-sm text-zinc-800">
+                    Log out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" onClick={() => setOpen(false)} className="py-4 text-sm text-zinc-800">
+                    Login
+                  </Link>
+                  <Link href="/signup" onClick={() => setOpen(false)} className="py-4 text-sm text-zinc-800">
+                    Sign Up
+                  </Link>
+                  <Link href={launchHref} onClick={() => setOpen(false)} className="py-4 text-sm font-medium text-black">
+                    Launch HireFit AI →
+                  </Link>
+                </>
+              )}
             </div>
           </motion.div>
         ) : null}

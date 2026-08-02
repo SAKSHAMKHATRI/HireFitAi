@@ -117,7 +117,7 @@ export function ResumePdfUploader({
             </div>
           ) : null}
 
-          <Button type="button" disabled className="h-12 w-full font-headline">
+          <Button type="button" onClick={() => upload.inputRef.current?.click()} className="h-12 w-full font-headline">
             {!upload.file ? (
               <>
                 <UploadCloud className="mr-2 h-4 w-4" strokeWidth={1.5} />

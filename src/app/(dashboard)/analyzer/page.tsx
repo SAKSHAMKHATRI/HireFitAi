@@ -13,6 +13,7 @@ import { ResumePdfUploader } from "@/components/resume/resume-pdf-uploader"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useResumePdfUpload } from "@/hooks/use-resume-pdf-upload"
+import { recordActivity } from "@/lib/analytics"
 import { fileToDataUri, friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
 const analysisTimeoutMs = 45000
@@ -48,6 +49,14 @@ export default function AnalyzerPage() {
         setAnalysis(output)
         setProgress(100)
         setStatus("complete")
+        recordActivity({
+          type: "resumeAnalyzed",
+          timestamp: Date.now(),
+          atsScore: output.atsScore,
+          technicalSkills: output.technicalSkills,
+          softSkills: output.softSkills,
+          missingSkills: output.missingSkills,
+        })
       } catch (analysisError) {
         window.clearInterval(progressTimer)
         throw analysisError

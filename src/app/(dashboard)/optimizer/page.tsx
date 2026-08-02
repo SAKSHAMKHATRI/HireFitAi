@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Zap, Loader2, Sparkles, Copy, RefreshCw } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { recordActivity } from "@/lib/analytics"
 
 export default function OptimizerPage() {
   const [inputBullets, setInputBullets] = useState("")
@@ -31,6 +32,13 @@ export default function OptimizerPage() {
         bulletPoints: bulletsArray
       })
       setResult(output)
+      recordActivity({
+        type: "bulletsOptimized",
+        timestamp: Date.now(),
+        inputCount: bulletsArray.length,
+        optimizedCount: output.optimizedBulletPoints.length,
+        optimizedBullets: output.optimizedBulletPoints,
+      })
     } catch (error) {
       toast({
         title: "Optimization failed",

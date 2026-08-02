@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { UserCheck, Loader2, TrendingUp, Search } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
+import { recordActivity } from "@/lib/analytics"
 
 export default function RecruiterPage() {
   const [resumeText, setResumeText] = useState("")
@@ -38,6 +39,11 @@ export default function RecruiterPage() {
         jobDescription
       })
       setResult(output)
+      recordActivity({
+        type: "recruiterSimulated",
+        timestamp: Date.now(),
+        shortlistProbability: output.shortlistProbability,
+      })
     } catch (error) {
       toast({
         title: "Simulation failed",

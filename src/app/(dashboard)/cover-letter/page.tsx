@@ -32,6 +32,8 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import { recordActivity } from "@/lib/analytics"
+import { loadSettings } from "@/lib/settings"
 import { useResumePdfUpload } from "@/hooks/use-resume-pdf-upload"
 import { fileToDataUri, friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
@@ -102,6 +104,7 @@ export default function CoverLetterPage() {
   const [output, setOutput] = useState<GenerateTailoredCoverLetterOutput | null>(null)
 
   // Restore a previously generated letter + inputs after mount (hydration-safe).
+  // When no saved letter exists, start from the tone configured in Settings.
   useEffect(() => {
     const saved = loadSavedLetter()
     if (saved) {
@@ -110,6 +113,8 @@ export default function CoverLetterPage() {
       setCompanyName(saved.companyName)
       setHiringManagerName(saved.hiringManagerName)
       setTone(saved.tone)
+    } else {
+      setTone(loadSettings().coverLetterTone)
     }
   }, [])
 
@@ -164,6 +169,12 @@ export default function CoverLetterPage() {
         companyName,
         hiringManagerName,
         tone,
+      })
+      recordActivity({
+        type: "coverLetterGenerated",
+        timestamp: Date.now(),
+        tone,
+        companyName,
       })
       toast({ title: "Cover letter ready", description: "Your tailored cover letter was generated." })
     } catch (generationError) {

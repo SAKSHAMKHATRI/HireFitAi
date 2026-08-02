@@ -38,6 +38,8 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import { recordActivity } from "@/lib/analytics"
+import { loadSettings } from "@/lib/settings"
 import { friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
 const generationTimeoutMs = 60000
@@ -232,6 +234,16 @@ export default function InterviewPage() {
     setSavedProgress(loadSavedProgress())
   }, [])
 
+  // Start from the role and experience configured in Settings (hydration-safe).
+  useEffect(() => {
+    const defaults = loadSettings()
+    setSetup((current) => ({
+      ...current,
+      targetRole: defaults.targetRole,
+      experienceLevel: defaults.experienceLevel,
+    }))
+  }, [])
+
   const saveProgress = () => {
     try {
       window.localStorage.setItem(
@@ -397,6 +409,17 @@ export default function InterviewPage() {
       setPhase("report")
       clearSavedProgress()
       setSavedProgress(null)
+      recordActivity({
+        type: "interviewCompleted",
+        timestamp: Date.now(),
+        overallScore: output.overallScore,
+        communication: output.communication,
+        technicalAccuracy: output.technicalAccuracy,
+        problemSolving: output.problemSolving,
+        confidence: output.confidence,
+        hiringRecommendation: output.hiringRecommendation,
+        recommendedTopics: output.recommendedTopics,
+      })
     } catch (evaluationError) {
       window.clearInterval(progressTimer)
       setProgress(0)

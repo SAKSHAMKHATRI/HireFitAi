@@ -376,6 +376,48 @@ function FaqSection() {
 function FinalSection() {
   const { isAuthenticated } = useAuth()
   const dashboardHref = isAuthenticated ? "/dashboard" : "/login?next=%2Fdashboard"
+  const coachHref = isAuthenticated ? "/coach" : "/login?next=%2Fcoach"
+
+  const footerColumns = [
+    {
+      title: "Company",
+      links: [
+        { label: "About", href: "/about" },
+        { label: "Careers", href: "/about#careers" },
+        { label: "Contact", href: "/contact" },
+      ],
+    },
+    {
+      title: "Product",
+      links: [
+        { label: "Features", href: "/#features" },
+        { label: "AI Coach", href: coachHref },
+        { label: "Dashboard", href: dashboardHref },
+      ],
+    },
+    {
+      title: "Resources",
+      links: [
+        { label: "Blog", href: "/#blog" },
+        { label: "Guides", href: "/#how-it-works" },
+        { label: "Help Center", href: "/contact" },
+      ],
+    },
+    {
+      title: "Legal",
+      links: [
+        { label: "Privacy", href: "/privacy" },
+        { label: "Terms", href: "/terms" },
+        { label: "Security", href: "/privacy#security" },
+      ],
+    },
+  ]
+
+  const socials = [
+    { label: "LinkedIn", href: "https://www.linkedin.com" },
+    { label: "X", href: "https://x.com" },
+    { label: "YouTube", href: "https://www.youtube.com" },
+  ]
 
   return (
     <>
@@ -398,21 +440,28 @@ function FinalSection() {
             <div className="flex items-center gap-3 font-display text-2xl font-semibold"><span className="grid h-9 w-9 place-items-center rounded-xl bg-zinc-950 text-sm text-brand-green">H</span>HireFit AI</div>
             <p className="mt-5 max-w-sm text-sm leading-6 text-zinc-600">Your AI career copilot for stronger resumes, smarter interviews, and faster career growth.</p>
           </div>
-          {[
-            ["Company", "About", "Careers", "Contact"],
-            ["Product", "Features", "AI Coach", "Dashboard"],
-            ["Resources", "Blog", "Guides", "Help Center"],
-            ["Legal", "Privacy", "Terms", "Security"],
-          ].map(([title, ...links]) => (
-            <div key={title} className="lg:col-span-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{title}</p>
-              <div className="mt-5 space-y-3">{links.map((link) => <span key={link} className="block text-sm text-zinc-500">{link}</span>)}</div>
+          {footerColumns.map((column) => (
+            <div key={column.title} className="lg:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{column.title}</p>
+              <div className="mt-5 space-y-3">
+                {column.links.map((link) => (
+                  <Link key={link.label} href={link.href} className="block text-sm text-zinc-500 transition-colors hover:text-zinc-950">
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
             </div>
           ))}
         </div>
         <div className="mx-auto flex max-w-7xl flex-col gap-4 pt-7 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 HireFit AI. Built for ambitious careers.</p>
-          <div className="flex gap-5"><span>LinkedIn</span><span>X</span><span>YouTube</span></div>
+          <div className="flex gap-5">
+            {socials.map((social) => (
+              <a key={social.label} href={social.href} target="_blank" rel="noreferrer" className="transition-colors hover:text-zinc-950">
+                {social.label}
+              </a>
+            ))}
+          </div>
         </div>
       </footer>
     </>
