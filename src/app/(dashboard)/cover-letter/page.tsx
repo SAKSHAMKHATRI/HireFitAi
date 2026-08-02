@@ -83,17 +83,6 @@ function saveLetter(saved: SavedLetter) {
   }
 }
 
-function stripMarkdownForDocx(markdown: string): string {
-  return markdown
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/^[-*+]\s+/gm, "")
-    .trim()
-}
-
 function qualityTone(checked: boolean) {
   return checked
     ? "border-green-500/30 bg-green-500/10 text-green-400"
@@ -206,35 +195,19 @@ export default function CoverLetterPage() {
   const downloadDocx = async () => {
     if (!output) return
     try {
-      // Lazy-load the docx library only when exporting, keeping the route bundle lean.
-      const { AlignmentType, Document, Packer, Paragraph, TextRun } = await import("docx")
-      const paragraphs = stripMarkdownForDocx(output.coverLetter)
-        .split(/\n{2,}/)
-        .filter((block) => block.trim().length > 0)
-        .map(
-          (block) =>
-            new Paragraph({
-              spacing: { after: 240, line: 320 },
-              children: [new TextRun({ text: block, size: 22 })],
-            })
-        )
-
-      const doc = new Document({
-        sections: [
-          {
-            properties: {},
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.RIGHT,
-                spacing: { after: 360 },
-                children: [new TextRun({ text: new Date().toLocaleDateString(), size: 22 })],
-              }),
-              ...paragraphs,
-            ],
-          },
-        ],
-      })
-      const blob = await Packer.toBlob(doc)
+      // The DOCX is generated server-side (the `docx` library cannot be bundled
+      // for the browser under Turbopack), then streamed back as a file download.
+      const response = await withTimeout(
+        fetch("/api/cover-letter/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markdown: output.coverLetter }),
+        }),
+        30000,
+        "DOCX export timed out. Please try again."
+      )
+      if (!response.ok) throw new Error("Export failed")
+      const blob = await response.blob()
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
