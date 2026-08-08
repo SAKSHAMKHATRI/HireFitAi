@@ -7,6 +7,10 @@ import { useAuth } from "@/components/auth/auth-provider"
 
 const navLinks = ["Features", "How It Works", "Testimonials", "Blog"]
 
+function navHref(item: string) {
+  return item === "Blog" ? "/blog" : `#${item.toLowerCase().replaceAll(" ", "-")}`
+}
+
 function HireFitLogo() {
   return (
     <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#1a1a1a] shadow-[0_14px_35px_rgba(0,0,0,0.2)]">
@@ -59,7 +63,7 @@ export function Navbar() {
 
         <div className="hidden md:flex col-span-6 items-center justify-center gap-7 text-[13px] text-zinc-700">
           {navLinks.map((item) => (
-            <a key={item} href={`#${item.toLowerCase().replaceAll(" ", "-")}`} className="transition-colors hover:text-black">
+            <a key={item} href={navHref(item)} className="transition-colors hover:text-black">
               {item}
             </a>
           ))}
@@ -120,7 +124,7 @@ export function Navbar() {
               {navLinks.map((item) => (
                 <Link
                   key={item}
-                  href={`#${item.toLowerCase().replaceAll(" ", "-")}`}
+                  href={navHref(item)}
                   onClick={() => setOpen(false)}
                   className="py-4 text-sm text-zinc-800"
                 >

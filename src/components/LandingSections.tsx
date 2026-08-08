@@ -49,20 +49,20 @@ function SectionHeading({ eyebrow, title, copy, dark = false }: { eyebrow: strin
 }
 
 const stats = [
-  ["98%", "ATS Accuracy"],
-  ["50K+", "Resumes Reviewed"],
-  ["10K+", "Mock Interviews"],
-  ["4.9★", "User Rating"],
+  ["AI-Powered", "Career Intelligence"],
+  ["8+", "Career Tools"],
+  ["Gemini", "Powered Analysis"],
+  ["24/7", "AI Career Assistant"],
 ]
 
-const logos = ["Google", "Microsoft", "Amazon", "Deloitte", "Accenture"]
+const logos = ["Resume Analyzer", "AI Match", "H.I.R.E Evaluator", "Career Coach", "AI Interview"]
 
 function TrustSection() {
   return (
     <section className="relative min-h-[80vh] overflow-hidden border-y border-black/5 bg-white/35 py-28">
       <div className="mx-auto max-w-7xl px-8 md:px-16 lg:px-20">
         <motion.p {...reveal} className="text-center text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-          Trusted by ambitious students and professionals
+          Built for ambitious students and professionals
         </motion.p>
       </div>
       <div className="relative mt-16 overflow-hidden border-y border-black/5 py-8">
@@ -398,7 +398,7 @@ function FinalSection() {
     {
       title: "Resources",
       links: [
-        { label: "Blog", href: "/#blog" },
+        { label: "Blog", href: "/blog" },
         { label: "Guides", href: "/#how-it-works" },
         { label: "Help Center", href: "/contact" },
       ],
@@ -414,8 +414,7 @@ function FinalSection() {
   ]
 
   const socials = [
-    { label: "LinkedIn", href: "https://www.linkedin.com" },
-    { label: "X", href: "https://x.com" },
+    { label: "LinkedIn", href: "https://www.linkedin.com/in/saksham-khatri-/" },
     { label: "YouTube", href: "https://www.youtube.com" },
   ]
 

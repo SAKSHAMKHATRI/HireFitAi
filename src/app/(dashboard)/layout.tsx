@@ -27,10 +27,6 @@ export default function DashboardLayout({
                 <span className="hidden sm:inline">Back to Landing Page</span>
               </Link>
               <div className="flex-1" />
-              <div className="flex items-center gap-4">
-                <span className="text-xs text-muted-foreground font-headline uppercase tracking-widest hidden sm:block">Status: Optimized</span>
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              </div>
             </header>
             <div className="flex flex-1 flex-col gap-4 p-6 overflow-y-auto">
               {children}

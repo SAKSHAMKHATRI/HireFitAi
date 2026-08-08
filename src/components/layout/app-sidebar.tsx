@@ -88,7 +88,7 @@ const data = {
   ],
   secondary: [
     {
-      title: "Version History",
+      title: "Product Updates",
       url: "/version-history",
       icon: History,
     },
@@ -115,7 +115,7 @@ export function AppSidebar() {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-headline font-semibold text-lg">HIREFIT AI</span>
-                  <span className="truncate text-xs text-muted-foreground uppercase tracking-widest">Career Suite v2.0</span>
+                  <span className="truncate text-xs text-muted-foreground uppercase tracking-widest">Career Suite</span>
                 </div>
               </Link>
             </SidebarMenuButton>
