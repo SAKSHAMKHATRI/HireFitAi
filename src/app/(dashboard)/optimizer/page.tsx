@@ -39,7 +39,7 @@ export default function OptimizerPage() {
         optimizedCount: output.optimizedBulletPoints.length,
         optimizedBullets: output.optimizedBulletPoints,
       })
-    } catch (error) {
+    } catch {
       toast({
         title: "Optimization failed",
         description: "Could not refine your bullet points at this time.",
@@ -74,7 +74,7 @@ export default function OptimizerPage() {
           <CardContent className="space-y-4">
             <Textarea 
               placeholder="e.g., Managed a team of 5 software engineers...&#10;Responsible for cloud migration..." 
-              className="min-h-[300px] bg-background/50 border-white/10 font-mono text-sm leading-relaxed"
+              className="min-h-[300px] bg-background/50 border-foreground/10 font-mono text-sm leading-relaxed"
               value={inputBullets}
               onChange={(e) => setInputBullets(e.target.value)}
             />
@@ -110,11 +110,11 @@ export default function OptimizerPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {result.optimizedBulletPoints.map((bullet, idx) => (
-                  <div key={idx} className="group relative p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all">
+                  <div key={idx} className="group relative p-4 rounded-xl bg-foreground/[0.03] border border-foreground/5 hover:border-foreground/10 transition-all">
                     <p className="text-sm leading-relaxed pr-8">{bullet}</p>
                     <button 
                       onClick={() => copyToClipboard(bullet)}
-                      className="absolute top-4 right-4 text-muted-foreground hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-4 right-4 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <Copy className="h-4 w-4" strokeWidth={1.5} />
                     </button>
@@ -126,7 +126,7 @@ export default function OptimizerPage() {
                     setResult(null);
                     setInputBullets("");
                   }}
-                  className="w-full mt-4 border-white/10 hover:bg-white/5"
+                  className="w-full mt-4 border-foreground/10 hover:bg-foreground/5"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" strokeWidth={1.5} />
                   Start Over
@@ -134,7 +134,7 @@ export default function OptimizerPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-white/5 rounded-2xl opacity-50">
+            <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-foreground/5 rounded-2xl opacity-50">
               <Zap className="h-16 w-16 text-muted-foreground mb-6" strokeWidth={0.5} />
               <h3 className="text-xl font-headline font-medium mb-2">Ready to Optimize</h3>
               <p className="text-sm text-muted-foreground max-w-xs">

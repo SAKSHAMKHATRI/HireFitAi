@@ -38,8 +38,10 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth/auth-provider"
 import { recordActivity } from "@/lib/analytics"
 import { loadSettings } from "@/lib/settings"
+import { deleteSavedRecord, fetchSavedRecord, saveSavedRecord, savedRecordTypes } from "@/lib/firebase-firestore"
 import { friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
 const generationTimeoutMs = 60000
@@ -122,7 +124,7 @@ function difficultyTone(difficulty: string) {
     case "Hard":
       return "border-red-500/30 text-red-400"
     default:
-      return "border-white/20 text-muted-foreground"
+      return "border-foreground/20 text-muted-foreground"
   }
 }
 
@@ -151,7 +153,7 @@ function SetupField({
     <div className="space-y-2">
       <label className="text-xs font-headline uppercase tracking-widest text-muted-foreground">{label}</label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger className="h-11 border-white/10 bg-background/50 font-headline">
+        <SelectTrigger className="h-11 border-foreground/10 bg-background/50 font-headline">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -186,7 +188,7 @@ function NumberedSectionCard({
       <CardContent className="grid gap-3">
         {items.length ? (
           items.map((item, index) => (
-            <div key={`${title}-${index}`} className="flex gap-4 rounded-xl border border-white/5 bg-white/[0.03] p-4">
+            <div key={`${title}-${index}`} className="flex gap-4 rounded-xl border border-foreground/5 bg-foreground/[0.03] p-4">
               <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tone === "yellow" ? "bg-yellow-500/10 text-yellow-400" : "bg-primary/10 text-primary"}`}>
                 {index + 1}
               </span>
@@ -216,6 +218,7 @@ function LoadingCard({ label, progress }: { label: string; progress: number }) {
 }
 
 export default function InterviewPage() {
+  const { user } = useAuth()
   const [phase, setPhase] = useState<InterviewPhase>("setup")
   const [setup, setSetup] = useState<InterviewSetup>(defaultSetup)
   const [questions, setQuestions] = useState<InterviewQuestion[]>([])
@@ -229,10 +232,54 @@ export default function InterviewPage() {
   const [report, setReport] = useState<EvaluateInterviewAnswersOutput | null>(null)
   const [savedProgress, setSavedProgress] = useState<SavedProgress | null>(null)
 
-  // Load any locally saved interview after mount to avoid a server/client hydration mismatch.
+  // Load any saved interview after mount to avoid a server/client hydration
+  // mismatch. Cloud (Firestore) is the source of truth for signed-in users;
+  // localStorage acts as the local cache.
   useEffect(() => {
-    setSavedProgress(loadSavedProgress())
-  }, [])
+    let cancelled = false
+    void (async () => {
+      let saved = loadSavedProgress()
+      if (user) {
+        let cloudLoadSucceeded = false
+        try {
+          const cloud = await fetchSavedRecord<SavedProgress>(savedRecordTypes.interviewProgress)
+          cloudLoadSucceeded = true
+          if (cancelled) return
+          const cloudData = cloud?.data
+          if (
+            cloudData &&
+            typeof cloudData === "object" &&
+            cloudData.setup &&
+            Array.isArray(cloudData.questions) &&
+            Array.isArray(cloudData.answers) &&
+            typeof cloudData.currentIndex === "number"
+          ) {
+            saved = cloudData
+            try {
+              window.localStorage.setItem(saveProgressKey, JSON.stringify(saved))
+            } catch {
+              // ignore storage failures
+            }
+          }
+        } catch (syncError) {
+          // Cloud read failed — fall back to the local cache (dev log only).
+          console.error("[saved:interview-progress] Cloud load failed (using local cache):", syncError)
+        }
+        // Migrate pre-cloud local-only progress so it follows the account.
+        // Only when the cloud read succeeded (a failed read must never let
+        // stale local data overwrite newer cloud data).
+        if (cloudLoadSucceeded && saved) {
+          void saveSavedRecord(savedRecordTypes.interviewProgress, saved).catch((syncError) => {
+            console.error("[saved:interview-progress] Cloud migration failed (kept locally):", syncError)
+          })
+        }
+      }
+      if (!cancelled) setSavedProgress(saved)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.uid])
 
   // Start from the role and experience configured in Settings (hydration-safe).
   useEffect(() => {
@@ -244,22 +291,32 @@ export default function InterviewPage() {
     }))
   }, [])
 
-  const saveProgress = () => {
+  const saveProgress = async () => {
+    const payload: SavedProgress = { setup, questions, answers, currentIndex, savedAt: Date.now() }
     try {
-      window.localStorage.setItem(
-        saveProgressKey,
-        JSON.stringify({
-          setup,
-          questions,
-          answers,
-          currentIndex,
-          savedAt: Date.now(),
-        } satisfies SavedProgress)
-      )
-      setSavedProgress({ setup, questions, answers, currentIndex, savedAt: Date.now() })
-      toast({ title: "Progress saved", description: "Your interview progress was saved locally. You can resume it later." })
-    } catch {
-      toast({ title: "Could not save progress", description: "Your browser blocked local storage.", variant: "destructive" })
+      window.localStorage.setItem(saveProgressKey, JSON.stringify(payload))
+      setSavedProgress(payload)
+      if (user) {
+        await saveSavedRecord(savedRecordTypes.interviewProgress, payload)
+        toast({ title: "Progress saved", description: "Your interview progress was saved and synced to your account." })
+      } else {
+        toast({ title: "Progress saved", description: "Your interview progress was saved locally. You can resume it later." })
+      }
+    } catch (error) {
+      const code = (error as { code?: string })?.code ?? "unknown"
+      const message = (error as { message?: string })?.message ?? String(error)
+      console.error("[saved:interview-progress] Save failed — error.code:", code, "| error.message:", message, error)
+      toast({ title: "Could not save progress", description: `Save failed — ${code}: ${message}`, variant: "destructive" })
+    }
+  }
+
+  const discardSavedProgress = () => {
+    clearSavedProgress()
+    setSavedProgress(null)
+    if (user) {
+      void deleteSavedRecord(savedRecordTypes.interviewProgress).catch((syncError) => {
+        console.error("[saved:interview-progress] Cloud delete failed:", syncError)
+      })
     }
   }
 
@@ -301,8 +358,7 @@ export default function InterviewPage() {
       setHintOpen(false)
       setProgress(100)
       setPhase("interview")
-      clearSavedProgress()
-      setSavedProgress(null)
+      discardSavedProgress()
     } catch (generationError) {
       window.clearInterval(progressTimer)
       setProgress(0)
@@ -407,8 +463,7 @@ export default function InterviewPage() {
       setReport(output)
       setProgress(100)
       setPhase("report")
-      clearSavedProgress()
-      setSavedProgress(null)
+      discardSavedProgress()
       recordActivity({
         type: "interviewCompleted",
         timestamp: Date.now(),
@@ -514,11 +569,11 @@ export default function InterviewPage() {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => resumeSaved(savedProgress)} className="border-white/10 hover:bg-white/5">
+                    <Button type="button" variant="outline" size="sm" onClick={() => resumeSaved(savedProgress)} className="border-foreground/10 hover:bg-foreground/5">
                       <RotateCcw className="mr-2 h-4 w-4" strokeWidth={1.5} />
                       Resume
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => { clearSavedProgress(); setSavedProgress(null) }} className="border-white/10 hover:bg-white/5">
+                    <Button type="button" variant="outline" size="sm" onClick={discardSavedProgress} className="border-foreground/10 hover:bg-foreground/5">
                       Discard
                     </Button>
                   </div>
@@ -601,7 +656,7 @@ export default function InterviewPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setHintOpen((current) => !current)}
-                className="border-white/10 hover:bg-white/5"
+                className="border-foreground/10 hover:bg-foreground/5"
               >
                 <Lightbulb className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 {hintOpen ? "Hide Hint" : "Show Hint"}
@@ -629,28 +684,28 @@ export default function InterviewPage() {
                   value={answers[currentIndex] ?? ""}
                   onChange={(event) => updateAnswer(currentIndex, event.target.value)}
                   placeholder="Type your answer as you would in a real interview. Aim for a structured response — the interviewer values clarity and specifics."
-                  className="min-h-[220px] resize-y bg-background/50 border-white/10 text-sm leading-relaxed"
+                  className="min-h-[220px] resize-y bg-background/50 border-foreground/10 text-sm leading-relaxed"
                 />
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                 <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={goPrevious} disabled={currentIndex === 0} className="border-white/10 hover:bg-white/5">
+                  <Button type="button" variant="outline" size="sm" onClick={goPrevious} disabled={currentIndex === 0} className="border-foreground/10 hover:bg-foreground/5">
                     <ChevronLeft className="mr-1 h-4 w-4" strokeWidth={1.5} />
                     Previous
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={skipQuestion} className="border-white/10 hover:bg-white/5">
+                  <Button type="button" variant="outline" size="sm" onClick={skipQuestion} className="border-foreground/10 hover:bg-foreground/5">
                     <SkipForward className="mr-1 h-4 w-4" strokeWidth={1.5} />
                     Skip
                   </Button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={saveProgress} className="border-white/10 hover:bg-white/5">
+                  <Button type="button" variant="outline" size="sm" onClick={saveProgress} className="border-foreground/10 hover:bg-foreground/5">
                     <Save className="mr-1 h-4 w-4" strokeWidth={1.5} />
                     Save Progress
                   </Button>
                   {!isLastQuestion ? (
-                    <Button type="button" variant="outline" size="sm" onClick={goNext} className="border-white/10 hover:bg-white/5">
+                    <Button type="button" variant="outline" size="sm" onClick={goNext} className="border-foreground/10 hover:bg-foreground/5">
                       Next
                       <ChevronRight className="ml-1 h-4 w-4" strokeWidth={1.5} />
                     </Button>
@@ -684,11 +739,11 @@ export default function InterviewPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">{setup.targetRole}</Badge>
-              <Badge variant="outline" className="border-white/10">{setup.experienceLevel}</Badge>
-              <Badge variant="outline" className="border-white/10">{setup.interviewType}</Badge>
-              <Badge variant="outline" className="border-white/10">{setup.difficulty}</Badge>
+              <Badge variant="outline" className="border-foreground/10">{setup.experienceLevel}</Badge>
+              <Badge variant="outline" className="border-foreground/10">{setup.interviewType}</Badge>
+              <Badge variant="outline" className="border-foreground/10">{setup.difficulty}</Badge>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={startOver} className="border-white/10 hover:bg-white/5">
+            <Button type="button" variant="outline" size="sm" onClick={startOver} className="border-foreground/10 hover:bg-foreground/5">
               <RotateCcw className="mr-2 h-4 w-4" strokeWidth={1.5} />
               Start New Interview
             </Button>
@@ -705,7 +760,7 @@ export default function InterviewPage() {
               <div className="flex flex-col items-center justify-center">
                 <div className="relative flex h-40 w-40 items-center justify-center">
                   <svg className="h-full w-full rotate-[-90deg]">
-                    <circle cx="80" cy="80" r="74" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-white/5" />
+                    <circle cx="80" cy="80" r="74" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-foreground/5" />
                     <circle
                       cx="80"
                       cy="80"
@@ -774,7 +829,7 @@ export default function InterviewPage() {
             <CardContent className="grid gap-3">
               {report.practicePlan.length ? (
                 report.practicePlan.map((step, index) => (
-                  <div key={`practice-${index}`} className="flex gap-4 rounded-xl border border-white/5 bg-white/[0.03] p-4">
+                  <div key={`practice-${index}`} className="flex gap-4 rounded-xl border border-foreground/5 bg-foreground/[0.03] p-4">
                     <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{index + 1}</span>
                     <p className="text-sm leading-6 text-muted-foreground">{step}</p>
                   </div>

@@ -36,7 +36,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth/auth-provider"
 import { recordActivity } from "@/lib/analytics"
+import { deleteSavedRecord, fetchSavedRecord, saveSavedRecord, savedRecordTypes } from "@/lib/firebase-firestore"
 import { friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
 const chatTimeoutMs = 120000
@@ -171,22 +173,22 @@ function MarkdownBlock({ content }: { content: string }) {
             const isBlock = className?.includes("language-") || String(children).includes("\n")
             if (!isBlock) {
               return (
-                <code className="rounded-md bg-white/10 border border-white/10 px-1.5 py-0.5 font-mono text-[12.5px] text-primary">
+                <code className="rounded-md bg-foreground/10 border border-foreground/10 px-1.5 py-0.5 font-mono text-[12.5px] text-primary">
                   {children}
                 </code>
               )
             }
             const code = String(children).replace(/\n$/, "")
             return (
-              <div className="group relative my-3 overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                <div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5">
+              <div className="group relative my-3 overflow-hidden rounded-xl border border-foreground/10 bg-black/40">
+                <div className="flex items-center justify-between border-b border-foreground/10 px-3 py-1.5">
                   <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                     {className?.match(/language-(\w+)/)?.[1] ?? "code"}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleCopyCode(code)}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
                   >
                     {copiedCode === code ? <Check className="h-3 w-3 text-green-500" /> : <ClipboardCopy className="h-3 w-3" />}
                     {copiedCode === code ? "Copied" : "Copy"}
@@ -210,21 +212,49 @@ function MarkdownBlock({ content }: { content: string }) {
 }
 
 export default function CareerCoachPage() {
+  const { user } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [smartContext, setSmartContext] = useState<ModuleContext>({})
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  // Tracks whether a cloud record exists so an empty chat only deletes when
+  // there was actually something to delete (no pointless deletes on mount).
+  const cloudRecordExistsRef = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Load saved conversation + smart context after mount to avoid hydration mismatches.
+  // Load saved conversation + smart context after mount to avoid hydration
+  // mismatches. Cloud (Firestore) is the source of truth for signed-in users;
+  // localStorage acts as the local cache.
   useEffect(() => {
-    setMessages(loadHistory())
-    setSmartContext(loadSmartContext())
-    setHistoryLoaded(true)
-  }, [])
+    let cancelled = false
+    void (async () => {
+      let history = loadHistory()
+      if (user) {
+        try {
+          const cloud = await fetchSavedRecord<ChatMessage[]>(savedRecordTypes.coachHistory)
+          if (cancelled) return
+          if (Array.isArray(cloud?.data) && cloud.data.length > 0) {
+            history = cloud.data
+            cloudRecordExistsRef.current = true
+            saveHistory(history) // write-through to the local cache
+          }
+        } catch (syncError) {
+          // Cloud read failed — fall back to the local cache (dev log only).
+          console.error("[saved:coach-history] Cloud load failed (using local cache):", syncError)
+        }
+      }
+      if (cancelled) return
+      setMessages(history)
+      setSmartContext(loadSmartContext())
+      setHistoryLoaded(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.uid])
 
   // Auto-scroll to the newest message.
   useEffect(() => {
@@ -310,10 +340,29 @@ export default function CareerCoachPage() {
     toast({ title: "Conversation cleared", description: "Started a fresh conversation with your Career Coach." })
   }
 
-  // Persist conversation once the initial load has settled.
+  // Persist conversation once the initial load has settled: local cache always;
+  // cloud record for signed-in users (an empty chat removes the cloud record).
   useEffect(() => {
-    if (historyLoaded) saveHistory(messages)
-  }, [messages, historyLoaded])
+    if (!historyLoaded) return
+    const trimmed = messages.slice(-60)
+    saveHistory(trimmed)
+    if (!user) return
+    if (trimmed.length === 0) {
+      // Only delete a cloud record that actually exists (never on plain mounts
+      // of an empty chat, and not when there was only ever local data).
+      if (cloudRecordExistsRef.current) {
+        cloudRecordExistsRef.current = false
+        void deleteSavedRecord(savedRecordTypes.coachHistory).catch((syncError) => {
+          console.error("[saved:coach-history] Cloud delete failed:", syncError)
+        })
+      }
+    } else {
+      cloudRecordExistsRef.current = true
+      void saveSavedRecord(savedRecordTypes.coachHistory, trimmed).catch((syncError) => {
+        console.error("[saved:coach-history] Cloud sync failed (kept locally):", syncError)
+      })
+    }
+  }, [messages, historyLoaded, user?.uid])
 
   // Deep-link support: the landing page career assistant routes here with ?q=<question>.
   const autoSendRef = useRef(false)
@@ -347,7 +396,7 @@ export default function CareerCoachPage() {
           <Card className="glass-card">
             <CardContent className="flex flex-col gap-0 p-0">
               {/* Chat header */}
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3.5">
+              <div className="flex items-center justify-between gap-3 border-b border-foreground/10 px-5 py-3.5">
                 <div className="flex items-center gap-3">
                   <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10">
                     <BrainCircuit className="h-5 w-5 text-primary" strokeWidth={1.5} />
@@ -364,7 +413,7 @@ export default function CareerCoachPage() {
                     <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
                     Gemini 2.5 Flash
                   </Badge>
-                  <Button type="button" variant="outline" size="sm" onClick={clearChat} disabled={messages.length === 0 || isLoading} className="border-white/10 hover:bg-white/5">
+                  <Button type="button" variant="outline" size="sm" onClick={clearChat} disabled={messages.length === 0 || isLoading} className="border-foreground/10 hover:bg-foreground/5">
                     <Trash2 className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Clear</span>
                   </Button>
@@ -385,7 +434,7 @@ export default function CareerCoachPage() {
                     <div className="max-w-md">
                       <h3 className="font-headline text-xl font-medium">Ask me anything about your career</h3>
                       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        I'll ground my advice in your HireFit data when it's available — and tell you honestly when it isn't.
+                        I&apos;ll ground my advice in your HireFit data when it&apos;s available — and tell you honestly when it isn&apos;t.
                       </p>
                     </div>
                     <div className="flex flex-wrap justify-center gap-2">
@@ -395,7 +444,7 @@ export default function CareerCoachPage() {
                           type="button"
                           onClick={() => sendMessage(prompt)}
                           disabled={isLoading}
-                          className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
+                          className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
                         >
                           {prompt}
                         </button>
@@ -408,7 +457,7 @@ export default function CareerCoachPage() {
                       const isUser = message.role === "user"
                       return (
                         <div key={`${index}-${message.role}`} className={`group flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-                          <Avatar className="h-8 w-8 shrink-0 border border-white/10">
+                          <Avatar className="h-8 w-8 shrink-0 border border-foreground/10">
                             {isUser ? (
                               <AvatarFallback className="bg-secondary text-xs font-bold text-muted-foreground">
                                 <User className="h-4 w-4" strokeWidth={1.5} />
@@ -424,7 +473,7 @@ export default function CareerCoachPage() {
                               className={`rounded-2xl px-4 py-3 ${
                                 isUser
                                   ? "rounded-tr-sm bg-primary text-primary-foreground"
-                                  : "rounded-tl-sm border border-white/10 bg-white/[0.04]"
+                                  : "rounded-tl-sm border border-foreground/10 bg-foreground/[0.04]"
                               }`}
                             >
                               {isUser ? (
@@ -437,7 +486,7 @@ export default function CareerCoachPage() {
                               <button
                                 type="button"
                                 onClick={() => copyToClipboard(message.content, "Answer")}
-                                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-all hover:bg-white/10 hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+                                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-all hover:bg-foreground/10 hover:text-foreground focus:opacity-100 group-hover:opacity-100"
                                 aria-label="Copy answer"
                               >
                                 <ClipboardCopy className="h-3 w-3" />
@@ -451,12 +500,12 @@ export default function CareerCoachPage() {
 
                     {isLoading ? (
                       <div className="flex gap-3">
-                        <Avatar className="h-8 w-8 shrink-0 border border-white/10">
+                        <Avatar className="h-8 w-8 shrink-0 border border-foreground/10">
                           <AvatarFallback className="bg-primary/15 text-primary">
                             <BrainCircuit className="h-4 w-4" strokeWidth={1.5} />
                           </AvatarFallback>
                         </Avatar>
-                        <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.04] px-4 py-2.5">
+                        <div className="rounded-2xl rounded-tl-sm border border-foreground/10 bg-foreground/[0.04] px-4 py-2.5">
                           <TypingDots />
                         </div>
                       </div>
@@ -474,7 +523,7 @@ export default function CareerCoachPage() {
                             messages.map((m) => m.role).lastIndexOf("user") < 0 ||
                             messages.map((m) => m.role).lastIndexOf("user") === messages.length - 1
                           }
-                          className="border-white/10 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                          className="border-foreground/10 text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                         >
                           <RefreshCw className="mr-2 h-3.5 w-3.5" strokeWidth={1.5} />
                           Regenerate last answer
@@ -494,7 +543,7 @@ export default function CareerCoachPage() {
               ) : null}
 
               {/* Input */}
-              <div className="border-t border-white/10 p-4">
+              <div className="border-t border-foreground/10 p-4">
                 <div className="flex gap-2.5">
                   <Textarea
                     ref={textareaRef}
@@ -507,7 +556,7 @@ export default function CareerCoachPage() {
                       }
                     }}
                     placeholder="Ask your mentor anything… (Enter to send, Shift+Enter for a new line)"
-                    className="max-h-40 min-h-[52px] flex-1 resize-none bg-background/50 border-white/10 text-sm leading-relaxed"
+                    className="max-h-40 min-h-[52px] flex-1 resize-none bg-background/50 border-foreground/10 text-sm leading-relaxed"
                   />
                   <Button
                     type="button"
@@ -528,7 +577,7 @@ export default function CareerCoachPage() {
                       type="button"
                       onClick={() => sendMessage(action.prompt)}
                       disabled={isLoading}
-                      className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
+                      className="flex items-center gap-1.5 rounded-lg border border-foreground/10 bg-foreground/[0.03] px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
                     >
                       <action.icon className="h-3 w-3" strokeWidth={1.5} />
                       {action.label}
@@ -546,18 +595,18 @@ export default function CareerCoachPage() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-headline text-sm font-semibold uppercase tracking-widest">Smart Context</p>
-                <Badge variant="outline" className="border-white/10 text-muted-foreground">
+                <Badge variant="outline" className="border-foreground/10 text-muted-foreground">
                   {availableContextCount} / {contextSources.length}
                 </Badge>
               </div>
               <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
-                The coach automatically uses your HireFit module results when they're available — and never guesses when they aren't.
+                The coach automatically uses your HireFit module results when they&apos;re available — and never guesses when they aren&apos;t.
               </p>
               <div className="mt-4 space-y-2.5">
                 {contextSources.map((source) => {
                   const available = Boolean(smartContext[source.key])
                   return (
-                    <div key={source.key} className={`flex items-start gap-2.5 rounded-xl border p-3 ${available ? "border-primary/30 bg-primary/5" : "border-white/5 bg-white/[0.02]"}`}>
+                    <div key={source.key} className={`flex items-start gap-2.5 rounded-xl border p-3 ${available ? "border-primary/30 bg-primary/5" : "border-foreground/5 bg-foreground/[0.02]"}`}>
                       <source.icon className={`mt-0.5 h-4 w-4 shrink-0 ${available ? "text-primary" : "text-muted-foreground/60"}`} strokeWidth={1.5} />
                       <div className="min-w-0">
                         <p className={`text-xs font-semibold ${available ? "text-primary" : "text-muted-foreground"}`}>{source.label}</p>
@@ -581,7 +630,7 @@ export default function CareerCoachPage() {
               <ul className="mt-3 space-y-2 text-xs leading-5 text-muted-foreground">
                 <li className="flex gap-2"><MessageSquare className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/60" strokeWidth={1.5} /> Honest, practical, and specific — like a real mentor.</li>
                 <li className="flex gap-2"><Target className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/60" strokeWidth={1.5} /> Grounded in your real HireFit data, never fabricated.</li>
-                <li className="flex gap-2"><AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/60" strokeWidth={1.5} /> If a detail is unavailable, I'll tell you exactly what's missing.</li>
+                <li className="flex gap-2"><AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/60" strokeWidth={1.5} /> If a detail is unavailable, I&apos;ll tell you exactly what&apos;s missing.</li>
               </ul>
             </CardContent>
           </Card>

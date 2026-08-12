@@ -190,7 +190,7 @@ export default function NotificationsPage() {
       case "reminder":
         return "border-yellow-500/30 bg-yellow-500/5"
       default:
-        return "border-white/5 bg-white/[0.03]"
+        return "border-foreground/5 bg-foreground/[0.03]"
     }
   }
 
@@ -223,7 +223,7 @@ export default function NotificationsPage() {
               <CardDescription>{unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}` : "You're all caught up."}</CardDescription>
             </div>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={markAllRead} disabled={unreadCount === 0} className="border-white/10 hover:bg-white/5">
+          <Button type="button" variant="outline" size="sm" onClick={markAllRead} disabled={unreadCount === 0} className="border-foreground/10 hover:bg-foreground/5">
             <CheckCheck className="mr-2 h-4 w-4" strokeWidth={1.5} />
             Mark all as read
           </Button>
@@ -231,7 +231,7 @@ export default function NotificationsPage() {
         <CardContent>
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/[0.03]">
+              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-foreground/[0.03]">
                 <Bell className="h-7 w-7 text-muted-foreground/50" strokeWidth={1} />
               </div>
               <h3 className="mt-4 font-headline text-base font-medium">No notifications</h3>
@@ -245,8 +245,8 @@ export default function NotificationsPage() {
                 const Icon = kindIcon(item)
                 const isUnread = !readIds.includes(item.id)
                 const body = (
-                  <div className={`flex items-start gap-3.5 rounded-xl border p-4 transition-colors ${kindTone(item.kind)} ${item.href ? "hover:bg-white/[0.06]" : ""}`}>
-                    <span className="relative mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04]">
+                  <div className={`flex items-start gap-3.5 rounded-xl border p-4 transition-colors ${kindTone(item.kind)} ${item.href ? "hover:bg-foreground/[0.06]" : ""}`}>
+                    <span className="relative mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-foreground/10 bg-foreground/[0.04]">
                       <Icon className="h-4 w-4 text-primary" strokeWidth={1.5} />
                       {isUnread ? <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-primary" aria-label="Unread" /> : null}
                     </span>
@@ -286,8 +286,8 @@ export default function NotificationsPage() {
           <CardDescription>Control which notifications you receive from the Settings page.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="border-white/10 text-muted-foreground">Module activity</Badge>
-          <Badge variant="outline" className="border-white/10 text-muted-foreground">Reminders</Badge>
+          <Badge variant="outline" className="border-foreground/10 text-muted-foreground">Module activity</Badge>
+          <Badge variant="outline" className="border-foreground/10 text-muted-foreground">Reminders</Badge>
           <Link href="/settings" className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-headline font-semibold text-primary transition-colors hover:border-primary/40 hover:bg-primary/10">
             <GraduationCap className="h-3.5 w-3.5" strokeWidth={1.5} />
             Manage in Settings

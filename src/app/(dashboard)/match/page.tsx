@@ -3,18 +3,16 @@
 import { useState } from "react"
 import {
   AlertCircle,
-  CheckCircle2,
   FileCheck2,
   Gauge,
   Loader2,
   RotateCcw,
-  ScanSearch,
-  Sparkles,
   Target,
   X,
 } from "lucide-react"
 
 import { matchResumeToJob, type MatchResumeToJobOutput } from "@/ai/flows/match-resume-to-job-flow"
+import { ListCard, NumberedCard } from "@/components/match/match-cards"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { ResumePdfUploader } from "@/components/resume/resume-pdf-uploader"
 import { Badge } from "@/components/ui/badge"
@@ -30,71 +28,6 @@ const matchTimeoutMs = 60000
 const maxJobDescriptionLength = 16000
 
 type MatchStatus = "idle" | "uploading" | "analyzing" | "complete" | "error"
-
-function ListCard({
-  title,
-  description,
-  items,
-  tone = "primary",
-}: {
-  title: string
-  description: string
-  items: string[]
-  tone?: "primary" | "yellow"
-}) {
-  return (
-    <Card className="glass-card">
-      <CardHeader>
-        <CardTitle className="text-sm font-headline tracking-widest uppercase">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
-        {items.length ? (
-          items.map((item) => (
-            <Badge key={item} variant={tone === "yellow" ? "outline" : "default"} className={tone === "yellow" ? "border-yellow-500/30 text-yellow-400" : "bg-primary/10 text-primary hover:bg-primary/20"}>
-              {item}
-            </Badge>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground">Unavailable from the provided resume and job description.</p>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function NumberedCard({
-  title,
-  description,
-  items,
-  tone = "primary",
-}: {
-  title: string
-  description: string
-  items: string[]
-  tone?: "primary" | "yellow"
-}) {
-  return (
-    <Card className="glass-card">
-      <CardHeader>
-        <CardTitle className="text-sm font-headline tracking-widest uppercase">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-3">
-        {items.length ? (
-          items.map((item, index) => (
-            <div key={item} className="flex gap-4 rounded-xl border border-white/5 bg-white/[0.03] p-4">
-              <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tone === "yellow" ? "bg-yellow-500/10 text-yellow-400" : "bg-primary/10 text-primary"}`}>{index + 1}</span>
-              <p className="text-sm leading-6 text-muted-foreground">{item}</p>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground">Unavailable from the provided resume and job description.</p>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
 
 export default function MatchPage() {
   const [jobDescription, setJobDescription] = useState("")
@@ -165,16 +98,21 @@ export default function MatchPage() {
         setResult(output)
         setProgress(100)
         setStatus("complete")
-        recordActivity({
-          type: "jobMatched",
-          timestamp: Date.now(),
-          matchScore: output.matchScore,
-          atsCompatibility: output.atsCompatibility,
-          matchedSkills: output.matchedSkills,
-          missingSkills: output.missingSkills,
-          matchedKeywords: output.matchedKeywords,
-          missingKeywords: output.missingKeywords,
-        })
+        recordActivity(
+          {
+            type: "jobMatched",
+            timestamp: Date.now(),
+            matchScore: output.matchScore,
+            atsCompatibility: output.atsCompatibility,
+            matchedSkills: output.matchedSkills,
+            missingSkills: output.missingSkills,
+            matchedKeywords: output.matchedKeywords,
+            missingKeywords: output.missingKeywords,
+          },
+          // Persist the full report so it survives a page refresh everywhere
+          // (the Resume Analyzer restores it from Firestore).
+          { fileName: upload.file?.name, result: output }
+        )
       } catch (matchError) {
         window.clearInterval(progressTimer)
         throw matchError
@@ -219,7 +157,7 @@ export default function MatchPage() {
               {status === "complete" ? <Badge variant="outline" className="border-primary/30 text-primary">Gemini Match</Badge> : null}
             </CardHeader>
             <CardContent>
-              <div className="min-h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+              <div className="min-h-[420px] overflow-hidden rounded-2xl border border-foreground/10 bg-foreground/[0.03]">
                 {upload.previewUrl ? (
                   <object data={upload.previewUrl} type="application/pdf" className="h-[420px] w-full">
                     <div className="flex h-[420px] flex-col items-center justify-center p-8 text-center">
@@ -244,7 +182,7 @@ export default function MatchPage() {
                 <CardTitle className="text-sm font-headline tracking-widest uppercase">Job Description</CardTitle>
                 <CardDescription>Paste the full role description for accurate ATS matching.</CardDescription>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={clearJobDescription} disabled={!jobDescription} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={clearJobDescription} disabled={!jobDescription} className="border-foreground/10 hover:bg-foreground/5">
                 <X className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 Clear
               </Button>
@@ -257,7 +195,7 @@ export default function MatchPage() {
                   setError("")
                 }}
                 placeholder="Paste the complete Job Description here..."
-                className="min-h-[280px] resize-y bg-background/50 border-white/10 text-sm leading-relaxed"
+                className="min-h-[280px] resize-y bg-background/50 border-foreground/10 text-sm leading-relaxed"
               />
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className={`text-xs ${jobDescription.length > maxJobDescriptionLength ? "text-red-400" : "text-muted-foreground"}`}>
@@ -307,7 +245,7 @@ export default function MatchPage() {
                 <CardTitle className="text-sm font-headline tracking-widest uppercase">Recruiter Summary</CardTitle>
                 <CardDescription>Compatibility report grounded only in the resume and job description.</CardDescription>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={resetMatch} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={resetMatch} className="border-foreground/10 hover:bg-foreground/5">
                 <RotateCcw className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 Reset Results
               </Button>

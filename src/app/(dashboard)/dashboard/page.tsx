@@ -52,6 +52,17 @@ export default function Dashboard() {
   const achievementTrend = useMemo(() => computeAchievementStrengthTrend(events), [events])
   const shortlist = useMemo(() => computeRecruiterShortlist(events), [events])
 
+  // Only pair a trend chip with the metric when both come from the same
+  // source (e.g. never an analyzer value with a stale AI Match trend).
+  const keywordTrend =
+    keywordCoverageTrend && keywordCoverageTrend.source === keywordCoverage?.source
+      ? keywordCoverageTrend
+      : undefined
+  const achievementTrendChip =
+    achievementTrend && achievementTrend.source === achievement?.source
+      ? achievementTrend
+      : undefined
+
   const healthItems = useMemo<HealthItem[]>(() => {
     const resumeAnalyzed = events
       .filter((event) => event.type === "resumeAnalyzed")
@@ -72,11 +83,19 @@ export default function Dashboard() {
       resumeAnalyzed && totalSkills > 0
         ? Math.round((resumeAnalyzed.softSkills.length / totalSkills) * 100)
         : null
+    const sectionScores = resumeAnalyzed?.sectionScores
 
     return [
       { label: "ATS Compatibility", value: atsCompatibility, detail: "Latest resume analysis" },
       { label: "Technical Alignment", value: technicalAlignment, detail: "Latest job match" },
       { label: "Soft Skill Variance", value: softSkillVariance, detail: "Detected skill mix" },
+      ...(sectionScores
+        ? [
+            { label: "Resume Structure", value: sectionScores.structure, detail: "Headings and ATS layout" },
+            { label: "Readability", value: sectionScores.readability, detail: "Scannability and phrasing" },
+            { label: "Achievement Quality", value: sectionScores.achievements, detail: "Measurable wins in resume" },
+          ]
+        : []),
     ]
   }, [events])
 
@@ -121,9 +140,15 @@ export default function Dashboard() {
         <MetricCard
           title="Keyword Coverage"
           value={keywordCoverage ? `${keywordCoverage.coverage}%` : "—"}
-          description={keywordCoverage ? `${keywordCoverage.matched} matched · ${keywordCoverage.missing} missing keywords` : undefined}
+          description={
+            keywordCoverage
+              ? keywordCoverage.source === "match"
+                ? `${keywordCoverage.matched} matched · ${keywordCoverage.missing} missing keywords`
+                : `${keywordCoverage.matched} skills detected · ${keywordCoverage.missing} gaps — from resume analysis`
+              : undefined
+          }
           icon={Search}
-          trend={keywordCoverageTrend ?? undefined}
+          trend={keywordTrend}
           empty={!keywordCoverage}
           actionHref="/match"
           actionLabel="Run AI Match"
@@ -131,9 +156,15 @@ export default function Dashboard() {
         <MetricCard
           title="Achievement Strength"
           value={achievement ? `${achievement.strength}/100` : "—"}
-          description={achievement ? `${achievement.quantifiedCount} of ${achievement.optimizedCount} bullets carry measurable impact` : undefined}
+          description={
+            achievement
+              ? achievement.source === "optimizer"
+                ? `${achievement.quantifiedCount} of ${achievement.optimizedCount} bullets carry measurable impact`
+                : `${achievement.quantifiedCount} of ${achievement.optimizedCount} detected achievements are quantified`
+              : undefined
+          }
           icon={Activity}
-          trend={achievementTrend ?? undefined}
+          trend={achievementTrendChip}
           empty={!achievement}
           actionHref="/optimizer"
           actionLabel="Optimize Bullets"
@@ -148,7 +179,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {!healthAvailable ? (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 py-12 text-center">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-foreground/10 py-12 text-center">
                 <BarChart3 className="mb-4 h-10 w-10 text-muted-foreground" strokeWidth={1} />
                 <h3 className="font-headline text-lg font-medium">No health metrics yet</h3>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
@@ -174,11 +205,11 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
-                <div className="flex flex-col items-center justify-center p-6 border rounded-xl border-white/5 bg-white/[0.02]">
+                <div className="flex flex-col items-center justify-center p-6 border rounded-xl border-foreground/5 bg-foreground/[0.02]">
                   <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" strokeWidth={1} />
                   {readiness ? (
                     <p className="text-center text-sm text-muted-foreground">
-                      Your overall application readiness is <span className="text-white font-bold">{readiness.score}/100</span>, derived from{" "}
+                      Your overall application readiness is <span className="text-foreground font-bold">{readiness.score}/100</span>, derived from{" "}
                       <span className="underline decoration-muted-foreground/30">{readinessSources} HireFit source{readinessSources === 1 ? "" : "s"}</span>.
                     </p>
                   ) : (
@@ -197,21 +228,21 @@ export default function Dashboard() {
             <CardTitle className="font-headline text-lg">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <Link href="/evaluator" className="flex items-center gap-3 p-3 rounded-lg border border-white/5 hover:bg-white/[0.05] transition-all text-sm text-left group">
+            <Link href="/evaluator" className="flex items-center gap-3 p-3 rounded-lg border border-foreground/5 hover:bg-foreground/[0.05] transition-all text-sm text-left group">
               <Cpu className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={1.5} />
               <div>
                 <p className="font-medium">Run H.I.R.E. Scan</p>
                 <p className="text-xs text-muted-foreground">Detailed match analysis</p>
               </div>
             </Link>
-            <Link href="/optimizer" className="flex items-center gap-3 p-3 rounded-lg border border-white/5 hover:bg-white/[0.05] transition-all text-sm text-left group">
+            <Link href="/optimizer" className="flex items-center gap-3 p-3 rounded-lg border border-foreground/5 hover:bg-foreground/[0.05] transition-all text-sm text-left group">
               <TrendingUp className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={1.5} />
               <div>
                 <p className="font-medium">Optimize Bullets</p>
                 <p className="text-xs text-muted-foreground">Refine your achievements</p>
               </div>
             </Link>
-            <Link href="/recruiter" className="flex items-center gap-3 p-3 rounded-lg border border-white/5 hover:bg-white/[0.05] transition-all text-sm text-left group">
+            <Link href="/recruiter" className="flex items-center gap-3 p-3 rounded-lg border border-foreground/5 hover:bg-foreground/[0.05] transition-all text-sm text-left group">
               <Layers className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={1.5} />
               <div>
                 <p className="font-medium">Recruiter Mode</p>

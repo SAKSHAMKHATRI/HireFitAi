@@ -46,7 +46,7 @@ export function RecentActivity({ events }: { events: AnalyticsEvent[] }) {
       <CardContent>
         {activity.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/[0.03]">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-foreground/[0.03]">
               <Activity className="h-7 w-7 text-muted-foreground/50" strokeWidth={1} />
             </div>
             <h3 className="mt-4 font-headline text-base font-medium">No AI activity yet</h3>
@@ -54,13 +54,13 @@ export function RecentActivity({ events }: { events: AnalyticsEvent[] }) {
               Run any HireFit module — completed analyses will appear here automatically.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <Link href="/analyzer" className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/analyzer" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 Resume Analyzer
               </Link>
-              <Link href="/interview" className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/interview" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 AI Interview
               </Link>
-              <Link href="/roadmap" className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/roadmap" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 Career Roadmap
               </Link>
             </div>
@@ -76,7 +76,7 @@ export function RecentActivity({ events }: { events: AnalyticsEvent[] }) {
                   {!isLast ? (
                     <span className="absolute left-[15px] top-10 h-[calc(100%+4px)] w-px bg-gradient-to-b from-primary/25 to-transparent" aria-hidden="true" />
                   ) : null}
-                  <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+                  <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-foreground/10 bg-foreground/[0.04]">
                     <Icon className="h-4 w-4 text-primary" strokeWidth={1.5} />
                   </span>
                   <div className="min-w-0 flex-1 pt-0.5">

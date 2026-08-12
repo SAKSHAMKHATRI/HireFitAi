@@ -4,16 +4,38 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "motion/react"
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
-import { clearMockAuth, getMockUser, hasMockAuth, setMockAuth, type MockUser } from "@/lib/mock-auth"
+import {
+  loginWithEmail,
+  logout,
+  observeAuthState,
+  registerWithEmail,
+  updateUserProfile,
+  type AuthUser,
+} from "@/lib/firebase-auth"
+import {
+  ensureUserRecord,
+  fetchUserRole,
+  hydrateUserDataFromFirestore,
+  touchLastActive,
+  type UserRole,
+} from "@/lib/firebase-firestore"
+import { clearHydratedData } from "@/lib/settings"
 
 type AuthStatus = "loading" | "authenticated" | "guest"
 
 type AuthContextValue = {
-  user: MockUser | null
+  user: AuthUser | null
   status: AuthStatus
   isAuthenticated: boolean
-  signIn: (user: MockUser) => void
-  signOut: () => void
+  /** The current user's role. "user" while loading, missing, or on read failure. */
+  role: UserRole
+  /** Whether the role lookup has finished ("ready") or is still in flight ("loading"). */
+  roleStatus: "loading" | "ready"
+  isAdmin: boolean
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (name: string, email: string, password: string) => Promise<void>
+  signOut: () => Promise<void>
+  updateUser: (updates: { name?: string; avatar?: string }) => Promise<void>
   requireAuth: (destination: string) => void
 }
 
@@ -26,55 +48,140 @@ function safeDestination(destination: string) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [user, setUser] = useState<MockUser | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [status, setStatus] = useState<AuthStatus>("loading")
+  const [role, setRole] = useState<UserRole>("user")
+  const [roleStatus, setRoleStatus] = useState<"loading" | "ready">("loading")
   const [authDestination, setAuthDestination] = useState<string | null>(null)
 
   useEffect(() => {
-    const syncAuth = () => {
-      const storedUser = getMockUser()
-      if (storedUser && hasMockAuth()) {
-        setUser(storedUser)
-        setStatus("authenticated")
-      } else {
-        setUser(null)
-        setStatus("guest")
-      }
-    }
+    // Remove the legacy mock-auth keys from the previous phase. A leftover
+    // mock session must never be mistaken for a real Firebase session.
+    window.localStorage.removeItem("hirefit_mock_auth")
+    window.localStorage.removeItem("hirefit_mock_user")
 
-    syncAuth()
-    window.addEventListener("storage", syncAuth)
-    return () => window.removeEventListener("storage", syncAuth)
+    // Real Firebase session: fires with the persisted user after restore
+    // (keeps a page refresh logged in) and stays in sync across tabs.
+    const unsubscribe = observeAuthState((nextUser) => {
+      setUser(nextUser)
+      setStatus(nextUser ? "authenticated" : "guest")
+    })
+    return unsubscribe
   }, [])
+
+  // Hydrate the profile/settings caches from Firestore whenever the
+  // authenticated user changes (sign-in, sign-up, refresh, user switch).
+  // On logout the caches are cleared so no other user's data leaks.
+  const uid = user?.uid
+  useEffect(() => {
+    if (!uid) {
+      clearHydratedData()
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        await hydrateUserDataFromFirestore(uid, () => cancelled)
+      } catch {
+        // Read/network errors are non-fatal here: caches keep their defaults
+        // and the Profile/Settings pages surface their own error states.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [uid])
+
+  // Phase 5 — role + account record. Resolved whenever the authenticated
+  // user changes (sign-in, sign-up, refresh, user switch). The account
+  // record is created lazily and the role is always fetched fresh so an
+  // admin grant/revoke takes effect on the next refresh.
+  useEffect(() => {
+    if (!uid) {
+      setRole("user")
+      // Only settle the role lookup once we know there is genuinely no
+      // session (guest). While the auth session is still restoring
+      // (status === "loading"), keep roleStatus "loading" — marking it
+      // "ready" early lets AdminRoute redirect a signed-in admin to
+      // /dashboard before their role document is ever read.
+      if (status === "guest") setRoleStatus("ready")
+      return
+    }
+    setRoleStatus("loading")
+    let cancelled = false
+    void (async () => {
+      // The account record is best-effort — a failed write must never
+      // block role resolution or gate admin access.
+      try {
+        await ensureUserRecord(uid, {
+          name: user?.name ?? "",
+          email: user?.email ?? "",
+          avatar: user?.avatar,
+        })
+      } catch {
+        // Non-fatal: role resolution continues below.
+      }
+      void touchLastActive(uid).catch(() => {})
+      const nextRole = await fetchUserRole(uid)
+      if (!cancelled) {
+        setRole(nextRole)
+        setRoleStatus("ready")
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [uid, user?.name, user?.email, user?.avatar, status])
 
   useEffect(() => {
     setAuthDestination(null)
   }, [pathname])
 
-  const value = useMemo<AuthContextValue>(() => ({
-    user,
-    status,
-    isAuthenticated: status === "authenticated" && user !== null,
-    signIn: (nextUser) => {
-      setMockAuth(nextUser)
-      setUser(nextUser)
-      setStatus("authenticated")
-    },
-    signOut: () => {
-      clearMockAuth()
-      setUser(null)
-      setStatus("guest")
-      router.push("/")
-    },
-    requireAuth: (destination) => {
-      const target = safeDestination(destination)
-      if (status === "authenticated" && user) {
-        router.push(target)
-      } else {
-        setAuthDestination(target)
-      }
-    },
-  }), [router, status, user])
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      status,
+      role,
+      roleStatus,
+      isAdmin: role === "admin",
+      isAuthenticated: status === "authenticated" && user !== null,
+      signIn: async (email, password) => {
+        const nextUser = await loginWithEmail(email, password)
+        setUser(nextUser)
+        setStatus("authenticated")
+        setRole("user")
+        setRoleStatus("loading")
+      },
+      signUp: async (name, email, password) => {
+        const nextUser = await registerWithEmail(name, email, password)
+        setUser(nextUser)
+        setStatus("authenticated")
+        setRole("user")
+        setRoleStatus("loading")
+      },
+      signOut: async () => {
+        await logout()
+        setUser(null)
+        setStatus("guest")
+        setRole("user")
+        setRoleStatus("ready")
+        router.push("/")
+      },
+      updateUser: async (updates) => {
+        const nextUser = await updateUserProfile(updates)
+        setUser(nextUser)
+      },
+      requireAuth: (destination) => {
+        const target = safeDestination(destination)
+        if (status === "authenticated" && user) {
+          router.push(target)
+        } else {
+          setAuthDestination(target)
+        }
+      },
+    }),
+    [router, status, user, role, roleStatus]
+  )
 
   const nextQuery = encodeURIComponent(authDestination ?? "/dashboard")
 

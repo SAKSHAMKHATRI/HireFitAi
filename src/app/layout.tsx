@@ -16,6 +16,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        {/* Restore a persisted light preference before hydration to avoid a theme flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("hirefit_theme");if(t==="light"){document.documentElement.classList.remove("dark")}}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body>
         <AuthProvider>
           {children}

@@ -11,8 +11,10 @@ export default function PrivacyPage() {
         <section className="rounded-[28px] border border-white/70 bg-white/55 p-7 backdrop-blur-xl">
           <h2 className="font-display text-2xl font-semibold text-zinc-950">1. What stays on your device</h2>
           <p className="mt-3 text-sm leading-7 text-zinc-600">
-            Your analytics, profile, settings, cover letters, coach conversations, and interview progress are stored locally in
-            your browser&apos;s localStorage. There is no HireFit AI server database — nothing on this list is transmitted to us.
+            When you are signed in, your profile, preferences, and saved work (cover letters, coach conversations, and
+            interview progress) sync to your Firebase account so they follow you across devices. Analytics activity remains
+            stored locally in your browser&apos;s localStorage and is not transmitted to us. Signing out keeps your saved work in
+            your account, not on the device.
           </p>
         </section>
 
@@ -28,8 +30,9 @@ export default function PrivacyPage() {
         <section className="rounded-[28px] border border-white/70 bg-white/55 p-7 backdrop-blur-xl">
           <h2 className="font-display text-2xl font-semibold text-zinc-950">3. Authentication</h2>
           <p className="mt-3 text-sm leading-7 text-zinc-600">
-            Sign-in is mock authentication: your name and email are stored only in your browser to personalize the experience.
-            No credentials are sent to a server, and there is no password storage.
+            Authentication is handled by Firebase Authentication (email/password or Google). Your credentials are managed by
+            Firebase, never by HireFit AI, and passwords are never stored in our database. Firestore holds only your profile,
+            preferences, and saved work, each scoped strictly to your account.
           </p>
         </section>
 

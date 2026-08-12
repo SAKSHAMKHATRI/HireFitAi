@@ -86,28 +86,69 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
+/* -- In-memory cache (hydrated from Firestore when signed in) -------------
+ * load/save keep working synchronously for existing consumers. Once the
+ * Firestore data has been fetched for the authenticated user, the cache is
+ * the source of truth and localStorage acts as a write-through cache.
+ * ---------------------------------------------------------------------- */
+
+let profileCache: ProfileData | null = null
+let settingsCache: HireFitSettings | null = null
+
+/** Replace the cached profile (e.g. after a Firestore fetch) and keep localStorage in sync. */
+export function hydrateProfile(profile: ProfileData): void {
+  profileCache = profile
+  writeJson(profileKey, profile)
+}
+
+/** Replace the cached settings (e.g. after a Firestore fetch) and keep localStorage in sync. */
+export function hydrateSettings(settings: HireFitSettings): void {
+  settingsCache = settings
+  writeJson(settingsKey, settings)
+}
+
+/** Drop cached values (e.g. on logout) so another user never sees them. */
+export function clearHydratedData(): void {
+  profileCache = null
+  settingsCache = null
+}
+
 /* -- Profile --------------------------------------------------------- */
 
 export function loadProfile(): ProfileData {
+  if (profileCache) return { ...profileCache }
   const stored = readJson<Partial<ProfileData>>(profileKey)
   if (!stored) return { ...defaultProfile }
   return { ...defaultProfile, ...stored }
 }
 
 export function saveProfile(profile: ProfileData): void {
+  profileCache = profile
   writeJson(profileKey, profile)
+}
+
+export function hasLocalProfile(): boolean {
+  if (typeof window === "undefined") return false
+  return window.localStorage.getItem(profileKey) !== null
 }
 
 /* -- Settings --------------------------------------------------------- */
 
 export function loadSettings(): HireFitSettings {
+  if (settingsCache) return { ...settingsCache }
   const stored = readJson<Partial<HireFitSettings>>(settingsKey)
   if (!stored) return { ...defaultSettings }
   return { ...defaultSettings, ...stored }
 }
 
 export function saveSettings(settings: HireFitSettings): void {
+  settingsCache = settings
   writeJson(settingsKey, settings)
+}
+
+export function hasLocalSettings(): boolean {
+  if (typeof window === "undefined") return false
+  return window.localStorage.getItem(settingsKey) !== null
 }
 
 /* -- Notification read state ------------------------------------------- */
@@ -133,6 +174,7 @@ export function markNotificationsRead(ids: string[]): void {
  */
 export function clearAllLocalData(): void {
   if (typeof window === "undefined") return
+  clearHydratedData()
   const keys = [
     "hirefit_analytics",
     "hirefit_profile",

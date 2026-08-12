@@ -21,6 +21,8 @@ type ResumePdfUploaderProps = {
   readyMessage?: string
   completeMessage?: string
   validationLabel?: string
+  /** Blocks new file selection / removal while an analysis is in flight. */
+  disabled?: boolean
   onReset?: () => void
 }
 
@@ -34,9 +36,11 @@ export function ResumePdfUploader({
   readyMessage = "Resume Ready",
   completeMessage = "Analysis Ready",
   validationLabel = "Gemini analysis",
+  disabled = false,
   onReset,
 }: ResumePdfUploaderProps) {
   const visibleError = upload.uploadError || error
+  const interactionsDisabled = disabled
 
   return (
     <div className="space-y-6">
@@ -49,18 +53,27 @@ export function ResumePdfUploader({
           <div
             onDragOver={(event) => {
               event.preventDefault()
-              upload.setIsDragging(true)
+              if (!interactionsDisabled) upload.setIsDragging(true)
             }}
             onDragLeave={() => upload.setIsDragging(false)}
-            onDrop={upload.handleDrop}
+            onDrop={(event) => {
+              event.preventDefault()
+              upload.setIsDragging(false)
+              if (!interactionsDisabled) upload.handleDrop(event)
+            }}
             className={cn(
-              "relative flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-background/40 p-8 text-center transition-all hover:border-primary/40 hover:bg-white/[0.04]",
-              upload.isDragging && "border-primary/70 bg-primary/5"
+              "relative flex min-h-[260px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-foreground/10 bg-background/40 p-8 text-center transition-all hover:border-primary/40 hover:bg-foreground/[0.04]",
+              upload.isDragging && "border-primary/70 bg-primary/5",
+              interactionsDisabled ? "cursor-not-allowed opacity-60 hover:border-foreground/10 hover:bg-background/40" : "cursor-pointer"
             )}
-            onClick={() => upload.inputRef.current?.click()}
+            onClick={() => {
+              if (!interactionsDisabled) upload.inputRef.current?.click()
+            }}
             role="button"
-            tabIndex={0}
+            tabIndex={interactionsDisabled ? -1 : 0}
+            aria-disabled={interactionsDisabled}
             onKeyDown={(event) => {
+              if (interactionsDisabled) return
               if (event.key === "Enter" || event.key === " ") upload.inputRef.current?.click()
             }}
           >
@@ -68,8 +81,11 @@ export function ResumePdfUploader({
               ref={upload.inputRef}
               type="file"
               accept="application/pdf"
+              disabled={interactionsDisabled}
               className="sr-only"
-              onChange={(event) => upload.handleFile(event.target.files?.[0])}
+              onChange={(event) => {
+                if (!interactionsDisabled) upload.handleFile(event.target.files?.[0])
+              }}
             />
             <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <UploadCloud className="h-8 w-8" strokeWidth={1.5} />
@@ -86,7 +102,7 @@ export function ResumePdfUploader({
           ) : null}
 
           {upload.file ? (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 items-start gap-3">
                   <FileText className="mt-0.5 h-5 w-5 shrink-0 text-primary" strokeWidth={1.5} />
@@ -101,7 +117,8 @@ export function ResumePdfUploader({
                     upload.resetFile()
                     onReset?.()
                   }}
-                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-white/5 hover:text-white"
+                  disabled={interactionsDisabled}
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="Remove resume"
                 >
                   <X className="h-4 w-4" />
@@ -117,7 +134,14 @@ export function ResumePdfUploader({
             </div>
           ) : null}
 
-          <Button type="button" onClick={() => upload.inputRef.current?.click()} className="h-12 w-full font-headline">
+          <Button
+            type="button"
+            onClick={() => {
+              if (!interactionsDisabled) upload.inputRef.current?.click()
+            }}
+            disabled={interactionsDisabled}
+            className="h-12 w-full font-headline disabled:cursor-not-allowed"
+          >
             {!upload.file ? (
               <>
                 <UploadCloud className="mr-2 h-4 w-4" strokeWidth={1.5} />
@@ -159,7 +183,7 @@ export function ResumePdfUploader({
             ["Preview generated", Boolean(upload.previewUrl), "Resume preview appears after upload."],
             [validationLabel, status === "complete", "Structured analysis appears after processing."],
           ].map(([label, complete, copy]) => (
-            <div key={String(label)} className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3">
+            <div key={String(label)} className="flex items-start gap-3 rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
               <CheckCircle2 className={cn("mt-0.5 h-4 w-4", complete ? "text-primary" : "text-muted-foreground")} strokeWidth={1.5} />
               <div>
                 <p className="font-medium">{label}</p>

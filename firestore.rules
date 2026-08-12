@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------
+    // Admin detection (Phase 5)
+    //
+    // The authoritative admin flag lives in the dedicated `roles`
+    // collection. Normal users can never write to `roles/{uid}`, so a
+    // user cannot grant themselves admin privileges from the client.
+    // A missing role document always means "user".
+    // ---------------------------------------------------------------
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // ---------------------------------------------------------------
+    // roles/{uid} — role documents. Only admins may write; a user may
+    // read their own role (needed to gate client-side UI). Everyone
+    // else is denied.
+    // ---------------------------------------------------------------
+    match /roles/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // analyses/{analysisId} — module activity records (resume analyses,
+    // job matches, interviews, etc.). The owner creates their records;
+    // the owner and admins may read them; only admins may delete them.
+    // The record's userId must equal the caller, so users cannot forge
+    // records attributed to other users.
+    //
+    // NOTE: reads reference `resource` (the stored document), never
+    // `request.resource` — request.resource is null for reads, which
+    // would silently deny owners access to their own records. The
+    // intent is unchanged: owner or admin may read.
+    // ---------------------------------------------------------------
+    match /analyses/{analysisId} {
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // users/{userId} — profile + account record. An authenticated user
+    // may read/write ONLY their own document; admins may read all user
+    // records for user management. Role is never stored here (it lives
+    // in `roles/{uid}`), so self-service profile writes can never
+    // escalate privileges.
+    // ---------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if isAdmin();
+
+      // Subcollections (settings/preferences, saved work, ...) stay
+      // owner-only — Phase 2 privacy model is preserved.
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Everything else stays denied by default — no other collection or
+    // document is readable or writable by anyone.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

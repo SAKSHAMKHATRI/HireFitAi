@@ -15,6 +15,9 @@
 
 # next.js
 /.next/
+
+# Firebase auth export (contains sensitive account data)
+auth-users.json
 /out/
 
 # production

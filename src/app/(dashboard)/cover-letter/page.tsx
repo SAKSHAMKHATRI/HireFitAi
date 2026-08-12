@@ -32,8 +32,10 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth/auth-provider"
 import { recordActivity } from "@/lib/analytics"
 import { loadSettings } from "@/lib/settings"
+import { fetchSavedRecord, saveSavedRecord, savedRecordTypes } from "@/lib/firebase-firestore"
 import { useResumePdfUpload } from "@/hooks/use-resume-pdf-upload"
 import { fileToDataUri, friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
@@ -92,6 +94,7 @@ function qualityTone(checked: boolean) {
 }
 
 export default function CoverLetterPage() {
+  const { user } = useAuth()
   const upload = useResumePdfUpload()
   const [status, setStatus] = useState<UploadStatus>("idle")
   const [progress, setProgress] = useState(0)
@@ -104,19 +107,51 @@ export default function CoverLetterPage() {
   const [output, setOutput] = useState<GenerateTailoredCoverLetterOutput | null>(null)
 
   // Restore a previously generated letter + inputs after mount (hydration-safe).
-  // When no saved letter exists, start from the tone configured in Settings.
+  // Cloud (Firestore) is the source of truth for signed-in users; localStorage
+  // acts as the local cache. When no saved letter exists, start from the tone
+  // configured in Settings.
   useEffect(() => {
-    const saved = loadSavedLetter()
-    if (saved) {
-      setOutput({ coverLetter: saved.letter, qualityCheck: saved.qualityCheck })
-      setJobDescription(saved.jobDescription)
-      setCompanyName(saved.companyName)
-      setHiringManagerName(saved.hiringManagerName)
-      setTone(saved.tone)
-    } else {
-      setTone(loadSettings().coverLetterTone)
+    let cancelled = false
+    void (async () => {
+      let saved = loadSavedLetter()
+      if (user) {
+        let cloudLoadSucceeded = false
+        try {
+          const cloud = await fetchSavedRecord<SavedLetter>(savedRecordTypes.coverLetter)
+          cloudLoadSucceeded = true
+          if (cancelled) return
+          if (cloud?.data && typeof cloud.data.letter === "string" && cloud.data.letter.trim()) {
+            saved = cloud.data
+            saveLetter(saved) // write-through to the local cache
+          }
+        } catch (syncError) {
+          // Cloud read failed — fall back to the local cache (dev log only).
+          console.error("[saved:cover-letter] Cloud load failed (using local cache):", syncError)
+        }
+        // Migrate pre-cloud local-only letters so they follow the account.
+        // Only when the cloud read succeeded (a failed read must never let
+        // stale local data overwrite newer cloud data).
+        if (cloudLoadSucceeded && saved) {
+          void saveSavedRecord(savedRecordTypes.coverLetter, saved).catch((syncError) => {
+            console.error("[saved:cover-letter] Cloud migration failed (kept locally):", syncError)
+          })
+        }
+      }
+      if (cancelled) return
+      if (saved) {
+        setOutput({ coverLetter: saved.letter, qualityCheck: saved.qualityCheck })
+        setJobDescription(saved.jobDescription)
+        setCompanyName(saved.companyName)
+        setHiringManagerName(saved.hiringManagerName)
+        setTone(saved.tone)
+      } else {
+        setTone(loadSettings().coverLetterTone)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-  }, [])
+  }, [user?.uid])
 
   const allQualityPassed = useMemo(
     () => (output ? Object.values(output.qualityCheck).every(Boolean) : false),
@@ -162,13 +197,19 @@ export default function CoverLetterPage() {
       setOutput(result)
       setProgress(100)
       setStatus("complete")
-      saveLetter({
+      const savedLetter = {
         letter: result.coverLetter,
         qualityCheck: result.qualityCheck,
         jobDescription,
         companyName,
         hiringManagerName,
         tone,
+      }
+      saveLetter(savedLetter)
+      // Cloud source of truth for signed-in users (fire-and-forget; the local
+      // cache already has the data if the cloud write fails).
+      void saveSavedRecord(savedRecordTypes.coverLetter, savedLetter).catch((syncError) => {
+        console.error("[saved:cover-letter] Cloud sync failed (kept locally):", syncError)
       })
       recordActivity({
         type: "coverLetterGenerated",
@@ -294,7 +335,7 @@ export default function CoverLetterPage() {
                   <button
                     type="button"
                     onClick={() => setJobDescription("")}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
                   >
                     <X className="h-3 w-3" strokeWidth={1.5} />
                     Clear
@@ -305,7 +346,7 @@ export default function CoverLetterPage() {
                 value={jobDescription}
                 onChange={(event) => setJobDescription(event.target.value.slice(0, maxJobDescriptionLength))}
                 placeholder="Paste the job description here… (required)"
-                className="min-h-[220px] resize-y bg-background/50 border-white/10 text-sm leading-relaxed"
+                className="min-h-[220px] resize-y bg-background/50 border-foreground/10 text-sm leading-relaxed"
               />
             </CardContent>
           </Card>
@@ -324,7 +365,7 @@ export default function CoverLetterPage() {
                     value={companyName}
                     onChange={(event) => setCompanyName(event.target.value)}
                     placeholder="e.g. Acme Corp (optional)"
-                    className="h-11 border-white/10 bg-background/50 pl-9"
+                    className="h-11 border-foreground/10 bg-background/50 pl-9"
                   />
                 </div>
               </div>
@@ -336,14 +377,14 @@ export default function CoverLetterPage() {
                     value={hiringManagerName}
                     onChange={(event) => setHiringManagerName(event.target.value)}
                     placeholder="e.g. Sarah Chen (optional)"
-                    className="h-11 border-white/10 bg-background/50 pl-9"
+                    className="h-11 border-foreground/10 bg-background/50 pl-9"
                   />
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-headline uppercase tracking-widest text-muted-foreground">Tone</label>
                 <Select value={tone} onValueChange={setTone}>
-                  <SelectTrigger className="h-11 border-white/10 bg-background/50 font-headline">
+                  <SelectTrigger className="h-11 border-foreground/10 bg-background/50 font-headline">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -402,19 +443,19 @@ export default function CoverLetterPage() {
                   </Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 no-print">
-                  <Button type="button" variant="outline" size="sm" onClick={copyLetter} className="border-white/10 hover:bg-white/5">
+                  <Button type="button" variant="outline" size="sm" onClick={copyLetter} className="border-foreground/10 hover:bg-foreground/5">
                     <ClipboardCopy className="mr-2 h-4 w-4" strokeWidth={1.5} />
                     Copy
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={generate} disabled={isGenerating} className="border-white/10 hover:bg-white/5">
+                  <Button type="button" variant="outline" size="sm" onClick={generate} disabled={isGenerating} className="border-foreground/10 hover:bg-foreground/5">
                     <RefreshCw className="mr-2 h-4 w-4" strokeWidth={1.5} />
                     Regenerate
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={downloadPdf} className="border-white/10 hover:bg-white/5">
+                  <Button type="button" variant="outline" size="sm" onClick={downloadPdf} className="border-foreground/10 hover:bg-foreground/5">
                     <Printer className="mr-2 h-4 w-4" strokeWidth={1.5} />
                     PDF
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={downloadDocx} className="border-white/10 hover:bg-white/5">
+                  <Button type="button" variant="outline" size="sm" onClick={downloadDocx} className="border-foreground/10 hover:bg-foreground/5">
                     <Download className="mr-2 h-4 w-4" strokeWidth={1.5} />
                     DOCX
                   </Button>
@@ -432,7 +473,7 @@ export default function CoverLetterPage() {
                   <Sparkles className="h-5 w-5 text-primary" strokeWidth={1.5} />
                 </CardHeader>
                 <CardContent>
-                  <div className="min-h-[420px] rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:p-8">
+                  <div className="min-h-[420px] rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-6 sm:p-8">
                     <div className="mx-auto max-w-[65ch] space-y-4 text-sm leading-7 text-muted-foreground">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
@@ -476,7 +517,7 @@ export default function CoverLetterPage() {
               </Card>
             </div>
           ) : (
-            <div className="flex h-full min-h-[420px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/5 p-12 text-center opacity-60">
+            <div className="flex h-full min-h-[420px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-foreground/5 p-12 text-center opacity-60">
               <FileCode className="mb-6 h-16 w-16 text-muted-foreground" strokeWidth={0.7} />
               <h3 className="font-headline text-xl font-medium">Your cover letter will appear here</h3>
               <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">

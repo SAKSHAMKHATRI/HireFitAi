@@ -37,7 +37,7 @@ export default function EvaluatorPage() {
         timestamp: Date.now(),
         matchScore: output.matchScore,
       })
-    } catch (error) {
+    } catch {
       toast({
         title: "Evaluation failed",
         description: "An error occurred while evaluating your resume.",
@@ -67,7 +67,7 @@ export default function EvaluatorPage() {
                 <label className="text-xs font-headline uppercase text-muted-foreground">Your Resume</label>
                 <Textarea 
                   placeholder="Paste resume content here..." 
-                  className="min-h-[250px] bg-background/50 border-white/10 font-mono text-sm"
+                  className="min-h-[250px] bg-background/50 border-foreground/10 font-mono text-sm"
                   value={resume}
                   onChange={(e) => setResume(e.target.value)}
                 />
@@ -76,7 +76,7 @@ export default function EvaluatorPage() {
                 <label className="text-xs font-headline uppercase text-muted-foreground">Job Description</label>
                 <Textarea 
                   placeholder="Paste target job description..." 
-                  className="min-h-[250px] bg-background/50 border-white/10 font-mono text-sm"
+                  className="min-h-[250px] bg-background/50 border-foreground/10 font-mono text-sm"
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
                 />
@@ -120,7 +120,7 @@ export default function EvaluatorPage() {
                         stroke="currentColor"
                         strokeWidth="8"
                         fill="transparent"
-                        className="text-white/5"
+                        className="text-foreground/5"
                       />
                       <circle
                         cx="64"
@@ -143,7 +143,7 @@ export default function EvaluatorPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                <div className="p-4 rounded-xl bg-foreground/[0.03] border border-foreground/5">
                   <h4 className="text-sm font-headline uppercase mb-3 flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
                     Reasoning & Feedback
@@ -155,7 +155,7 @@ export default function EvaluatorPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-white/5 rounded-2xl opacity-50">
+            <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-foreground/5 rounded-2xl opacity-50">
               <BrainCircuit className="h-16 w-16 text-muted-foreground mb-6" strokeWidth={0.5} />
               <h3 className="text-xl font-headline font-medium mb-2">No Analysis Yet</h3>
               <p className="text-sm text-muted-foreground max-w-xs">

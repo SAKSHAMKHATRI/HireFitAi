@@ -18,7 +18,7 @@ export function SkillGapOverview({ events }: { events: AnalyticsEvent[] }) {
       <CardContent>
         {!gap ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/[0.03]">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-foreground/[0.03]">
               <Gauge className="h-7 w-7 text-muted-foreground/50" strokeWidth={1} />
             </div>
             <h3 className="mt-4 font-headline text-base font-medium">No skill gap data yet</h3>
@@ -26,10 +26,10 @@ export function SkillGapOverview({ events }: { events: AnalyticsEvent[] }) {
               Run AI Match to surface missing keywords, or generate a Career Roadmap for a structured skill plan.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <Link href="/match" className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/match" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 Run AI Match
               </Link>
-              <Link href="/roadmap" className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/roadmap" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 Generate Roadmap
               </Link>
             </div>
@@ -44,7 +44,7 @@ export function SkillGapOverview({ events }: { events: AnalyticsEvent[] }) {
                 </p>
                 <div className="grid gap-3">
                   {gap.prioritySkills.map((item) => (
-                    <div key={item.skill} className="rounded-xl border border-white/5 bg-white/[0.03] p-3.5">
+                    <div key={item.skill} className="rounded-xl border border-foreground/5 bg-foreground/[0.03] p-3.5">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium text-foreground">{item.skill}</p>
                         <span className="shrink-0 text-xs text-muted-foreground">
@@ -54,11 +54,11 @@ export function SkillGapOverview({ events }: { events: AnalyticsEvent[] }) {
                       <div className="mt-2.5 space-y-1.5">
                         <div className="flex items-center gap-2">
                           <span className="w-7 shrink-0 text-[9px] uppercase tracking-wider text-muted-foreground">Now</span>
-                          <Progress value={item.currentLevel} className="h-1 bg-white/5 [&>div]:bg-muted-foreground/60" />
+                          <Progress value={item.currentLevel} className="h-1 bg-foreground/5 [&>div]:bg-muted-foreground/60" />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="w-7 shrink-0 text-[9px] uppercase tracking-wider text-primary">Goal</span>
-                          <Progress value={item.requiredLevel} className="h-1 bg-white/5" />
+                          <Progress value={item.requiredLevel} className="h-1 bg-foreground/5" />
                         </div>
                       </div>
                     </div>
@@ -94,7 +94,7 @@ export function SkillGapOverview({ events }: { events: AnalyticsEvent[] }) {
                     <p className="text-sm font-medium text-foreground">Toward roadmap targets</p>
                     <span className="shrink-0 font-headline text-sm font-bold text-primary">{gap.learningProgress}%</span>
                   </div>
-                  <Progress value={gap.learningProgress} className="mt-2.5 h-1.5 bg-white/5" />
+                  <Progress value={gap.learningProgress} className="mt-2.5 h-1.5 bg-foreground/5" />
                 </div>
               </div>
             ) : null}

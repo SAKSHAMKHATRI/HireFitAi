@@ -26,7 +26,7 @@ export function CareerProgress({ events }: { events: AnalyticsEvent[] }) {
         <div className="flex items-center gap-5">
           <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
             <svg className="h-full w-full -rotate-90">
-              <circle cx="56" cy="56" r="52" stroke="currentColor" strokeWidth="9" fill="transparent" className="text-white/5" />
+              <circle cx="56" cy="56" r="52" stroke="currentColor" strokeWidth="9" fill="transparent" className="text-foreground/5" />
               <circle
                 cx="56"
                 cy="56"
@@ -64,7 +64,7 @@ export function CareerProgress({ events }: { events: AnalyticsEvent[] }) {
               className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors ${
                 module.used
                   ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
-                  : "border-white/5 bg-white/[0.02] hover:bg-white/[0.05]"
+                  : "border-foreground/5 bg-foreground/[0.02] hover:bg-foreground/[0.05]"
               }`}
             >
               {module.used ? (
@@ -80,7 +80,7 @@ export function CareerProgress({ events }: { events: AnalyticsEvent[] }) {
         </div>
 
         {progress.completedModules === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 py-6 text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-foreground/10 py-6 text-center">
             <Rocket className="h-6 w-6 text-muted-foreground/50" strokeWidth={1} />
             <p className="mt-2.5 max-w-[26ch] text-sm leading-6 text-muted-foreground">
               Run any HireFit module to start tracking your career progress.
@@ -97,7 +97,7 @@ export function CareerProgress({ events }: { events: AnalyticsEvent[] }) {
             </p>
             <div className="grid gap-1.5">
               {milestones.map((milestone) => (
-                <div key={milestone.key} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${milestone.reached ? "bg-white/[0.03]" : ""}`}>
+                <div key={milestone.key} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${milestone.reached ? "bg-foreground/[0.03]" : ""}`}>
                   {milestone.reached ? (
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" strokeWidth={1.5} />
                   ) : (

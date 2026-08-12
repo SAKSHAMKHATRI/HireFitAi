@@ -34,7 +34,7 @@ export function PerformanceTrends({ events }: { events: AnalyticsEvent[] }) {
       <CardContent>
         {series.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/[0.03]">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-foreground/[0.03]">
               <BarChart3 className="h-7 w-7 text-muted-foreground/50" strokeWidth={1} />
             </div>
             <h3 className="mt-4 font-headline text-base font-medium">No trends to chart yet</h3>

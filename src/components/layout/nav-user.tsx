@@ -7,6 +7,7 @@ import {
   ChevronsUpDown,
   LogOut,
   Settings,
+  ShieldCheck,
   User,
   UserPlus,
 } from "lucide-react"
@@ -36,7 +37,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
-  const { user, status, isAuthenticated, signOut } = useAuth()
+  const { user, status, isAuthenticated, isAdmin, signOut } = useAuth()
   const displayName = user?.name ?? "Guest"
   const displayEmail = user?.email ?? "Not signed in"
   const avatar = user?.avatar
@@ -90,6 +91,14 @@ export function NavUser() {
             {isAuthenticated ? (
               <>
                 <DropdownMenuGroup>
+                  {isAdmin ? (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin">
+                        <ShieldCheck className="mr-2 h-4 w-4 text-brand-green" strokeWidth={1.5} />
+                        Admin Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuItem asChild>
                     <Link href="/profile">
                       <User className="mr-2 h-4 w-4" strokeWidth={1.5} />

@@ -75,14 +75,22 @@ function buildReportMarkdown(
   const coverage = computeKeywordCoverage(events)
   if (coverage) {
     lines.push("## Keyword Coverage")
-    lines.push(`Coverage: **${coverage.coverage}%** (${coverage.matched} matched · ${coverage.missing} missing keywords)`)
+    lines.push(
+      coverage.source === "match"
+        ? `Coverage: **${coverage.coverage}%** (${coverage.matched} matched · ${coverage.missing} missing keywords)`
+        : `Coverage: **${coverage.coverage}%** — skill coverage from your resume analysis (${coverage.matched} detected · ${coverage.missing} gaps)`
+    )
     lines.push("")
   }
 
   const achievement = computeAchievementStrength(events)
   if (achievement) {
     lines.push("## Achievement Strength")
-    lines.push(`Strength: **${achievement.strength}/100** — ${achievement.quantifiedCount} of ${achievement.optimizedCount} bullets carry measurable impact`)
+    lines.push(
+      achievement.source === "optimizer"
+        ? `Strength: **${achievement.strength}/100** — ${achievement.quantifiedCount} of ${achievement.optimizedCount} bullets carry measurable impact`
+        : `Strength: **${achievement.strength}/100** — ${achievement.quantifiedCount} of ${achievement.optimizedCount} detected achievements are quantified`
+    )
     lines.push("")
   }
 
@@ -261,7 +269,7 @@ export default function ExportReportsPage() {
       {!hasContent ? (
         <Card className="glass-card">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-white/[0.03]">
+            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-foreground/[0.03]">
               <BarChart3 className="h-8 w-8 text-muted-foreground/50" strokeWidth={1} />
             </div>
             <h3 className="mt-5 font-headline text-xl font-medium">Nothing to export yet</h3>
@@ -269,16 +277,16 @@ export default function ExportReportsPage() {
               Run any HireFit module and your results will be compiled here automatically — no dummy data, ever.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <Link href="/analyzer" className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/analyzer" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 Resume Analyzer
               </Link>
-              <Link href="/match" className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/match" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 AI Match
               </Link>
-              <Link href="/interview" className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/interview" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 AI Interview
               </Link>
-              <Link href="/coach" className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
+              <Link href="/coach" className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground">
                 Career Coach
               </Link>
             </div>
@@ -294,11 +302,11 @@ export default function ExportReportsPage() {
               {coachHistory.length > 0 ? <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">Coach chat</Badge> : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={copyReport} disabled={exporting !== null} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={copyReport} disabled={exporting !== null} className="border-foreground/10 hover:bg-foreground/5">
                 {exporting === "copy" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ClipboardCopy className="mr-2 h-4 w-4" strokeWidth={1.5} />}
                 Copy
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={exporting !== null} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={exporting !== null} className="border-foreground/10 hover:bg-foreground/5">
                 {exporting === "pdf" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" strokeWidth={1.5} />}
                 Download PDF
               </Button>
@@ -321,7 +329,7 @@ export default function ExportReportsPage() {
 
           <Card className="glass-card" id="export-report">
             <CardContent>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:p-10">
+              <div className="rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-6 sm:p-10">
                 <div className="mx-auto max-w-[70ch] text-sm leading-7 text-muted-foreground">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
@@ -333,7 +341,7 @@ export default function ExportReportsPage() {
                       ol: ({ children }) => <ol className="ml-5 mb-3 list-decimal space-y-1.5">{children}</ol>,
                       li: ({ children }) => <li>{children}</li>,
                       strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-                      hr: () => <hr className="my-6 border-white/10" />,
+                      hr: () => <hr className="my-6 border-foreground/10" />,
                     }}
                   >
                     {markdown}

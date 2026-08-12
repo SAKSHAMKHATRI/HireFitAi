@@ -15,6 +15,17 @@ const maxStoredEvents = 400
 /* Event types                                                         */
 /* ------------------------------------------------------------------ */
 
+/** Per-section quality scores produced by the resume analyzer (0-100 each). */
+export type ResumeSectionScores = {
+  technicalSkills: number
+  experience: number
+  projects: number
+  education: number
+  achievements: number
+  structure: number
+  readability: number
+}
+
 export type ResumeAnalyzedEvent = {
   type: "resumeAnalyzed"
   timestamp: number
@@ -22,6 +33,14 @@ export type ResumeAnalyzedEvent = {
   technicalSkills: string[]
   softSkills: string[]
   missingSkills: string[]
+  /** AI-evaluated keyword/skill coverage for the resume (0-100). */
+  keywordCoverage?: number
+  /** Per-section quality scores from the analyzer. */
+  sectionScores?: ResumeSectionScores
+  /** Quantified accomplishments explicitly stated in the resume. */
+  achievements?: string[]
+  /** Candidate name extracted from the resume (non-sensitive). */
+  candidateName?: string
 }
 
 export type JobMatchedEvent = {
@@ -115,13 +134,35 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string")
 }
 
+function isValidSectionScores(value: unknown): value is ResumeSectionScores {
+  if (!isRecord(value)) return false
+  const keys: (keyof ResumeSectionScores)[] = [
+    "technicalSkills",
+    "experience",
+    "projects",
+    "education",
+    "achievements",
+    "structure",
+    "readability",
+  ]
+  return keys.every((key) => isFiniteNumber(value[key]))
+}
+
 function isValidEvent(raw: unknown): raw is AnalyticsEvent {
   if (!isRecord(raw) || !isFiniteNumber(raw.timestamp) || typeof raw.type !== "string") {
     return false
   }
   switch (raw.type) {
     case "resumeAnalyzed":
-      return isFiniteNumber(raw.atsScore) && isStringArray(raw.technicalSkills) && isStringArray(raw.softSkills) && isStringArray(raw.missingSkills)
+      return (
+        isFiniteNumber(raw.atsScore) &&
+        isStringArray(raw.technicalSkills) &&
+        isStringArray(raw.softSkills) &&
+        isStringArray(raw.missingSkills) &&
+        (raw.keywordCoverage === undefined || isFiniteNumber(raw.keywordCoverage)) &&
+        (raw.sectionScores === undefined || isValidSectionScores(raw.sectionScores)) &&
+        (raw.achievements === undefined || isStringArray(raw.achievements))
+      )
     case "jobMatched":
       return isFiniteNumber(raw.matchScore) && isFiniteNumber(raw.atsCompatibility) && isStringArray(raw.matchedSkills) && isStringArray(raw.missingSkills) && isStringArray(raw.matchedKeywords) && isStringArray(raw.missingKeywords)
     case "hireEvaluated":
@@ -156,7 +197,10 @@ export function loadAnalytics(): AnalyticsEvent[] {
   }
 }
 
-export function recordActivity(event: AnalyticsEvent): void {
+export function recordActivity(
+  event: AnalyticsEvent,
+  meta?: { fileName?: string; result?: unknown }
+): void {
   if (typeof window === "undefined") return
   try {
     const current = loadAnalytics()
@@ -168,6 +212,11 @@ export function recordActivity(event: AnalyticsEvent): void {
   } catch {
     // Analytics must never break the module that produced the event.
   }
+  // Mirror the event into Firestore (Phase 5) so admins can see real module
+  // activity. Fire-and-forget: failures never surface in the module UI.
+  void import("@/lib/firebase-analytics")
+    .then(({ persistAnalysisEvent }) => persistAnalysisEvent(event, meta))
+    .catch(() => {})
 }
 
 /* ------------------------------------------------------------------ */
@@ -320,36 +369,73 @@ export function computeReadinessTrend(events: AnalyticsEvent[]): { value: string
 
 /* -- Keyword Coverage ---------------------------------------------- */
 
-export function computeKeywordCoverage(events: AnalyticsEvent[]): {
+export type KeywordCoverageResult = {
   coverage: number
   matched: number
   missing: number
-} | null {
-  const match = latestByType(events, "jobMatched")
-  if (!match) return null
-  const total = match.matchedKeywords.length + match.missingKeywords.length
-  if (total === 0) return null
-  return {
-    coverage: Math.round((match.matchedKeywords.length / total) * 100),
-    matched: match.matchedKeywords.length,
-    missing: match.missingKeywords.length,
-  }
+  source: "match" | "analyzer"
 }
 
-export function computeKeywordCoverageTrend(events: AnalyticsEvent[]): { value: string; positive: boolean } | null {
+export function computeKeywordCoverage(events: AnalyticsEvent[]): KeywordCoverageResult | null {
+  // AI Match is the primary source: keywords are compared against a real
+  // job description.
+  const match = latestByType(events, "jobMatched")
+  if (match) {
+    const total = match.matchedKeywords.length + match.missingKeywords.length
+    if (total === 0) return null
+    return {
+      coverage: Math.round((match.matchedKeywords.length / total) * 100),
+      matched: match.matchedKeywords.length,
+      missing: match.missingKeywords.length,
+      source: "match",
+    }
+  }
+  // Fall back to the resume analyzer's AI-evaluated keyword coverage when no
+  // job match exists yet. Never fabricated — only used when the analyzer ran.
+  const resume = latestByType(events, "resumeAnalyzed")
+  if (resume?.keywordCoverage !== undefined && resume.keywordCoverage !== null) {
+    return {
+      coverage: Math.round(resume.keywordCoverage),
+      matched: resume.technicalSkills.length + resume.softSkills.length,
+      missing: resume.missingSkills.length,
+      source: "analyzer",
+    }
+  }
+  return null
+}
+
+export function computeKeywordCoverageTrend(events: AnalyticsEvent[]): {
+  value: string
+  positive: boolean
+  source: "match" | "analyzer"
+} | null {
   const matches = events
     .filter((event): event is JobMatchedEvent => event.type === "jobMatched")
     .sort((a, b) => a.timestamp - b.timestamp)
-  if (matches.length < 2) return null
-  const coverage = (match: JobMatchedEvent) => {
-    const total = match.matchedKeywords.length + match.missingKeywords.length
-    return total === 0 ? null : Math.round((match.matchedKeywords.length / total) * 100)
+  if (matches.length >= 2) {
+    const coverage = (match: JobMatchedEvent) => {
+      const total = match.matchedKeywords.length + match.missingKeywords.length
+      return total === 0 ? null : Math.round((match.matchedKeywords.length / total) * 100)
+    }
+    const last = coverage(matches[matches.length - 1])
+    const previous = coverage(matches[matches.length - 2])
+    if (last !== null && previous !== null) {
+      const delta = last - previous
+      return { value: `${delta >= 0 ? "+" : ""}${delta}%`, positive: delta >= 0, source: "match" }
+    }
   }
-  const last = coverage(matches[matches.length - 1])
-  const previous = coverage(matches[matches.length - 2])
-  if (last === null || previous === null) return null
-  const delta = last - previous
-  return { value: `${delta >= 0 ? "+" : ""}${delta}%`, positive: delta >= 0 }
+  // Analyzer-derived coverage trend (only when no job matches exist).
+  const resumes = events
+    .filter((event): event is ResumeAnalyzedEvent => event.type === "resumeAnalyzed")
+    .filter((event) => event.keywordCoverage !== undefined && event.keywordCoverage !== null)
+    .sort((a, b) => a.timestamp - b.timestamp)
+  if (resumes.length >= 2) {
+    const last = resumes[resumes.length - 1].keywordCoverage as number
+    const previous = resumes[resumes.length - 2].keywordCoverage as number
+    const delta = last - previous
+    return { value: `${delta >= 0 ? "+" : ""}${delta}%`, positive: delta >= 0, source: "analyzer" }
+  }
+  return null
 }
 
 /* -- Achievement Strength ------------------------------------------- */
@@ -358,31 +444,67 @@ export function computeAchievementStrength(events: AnalyticsEvent[]): {
   strength: number
   optimizedCount: number
   quantifiedCount: number
+  source: "optimizer" | "analyzer"
 } | null {
   const optimized = latestByType(events, "bulletsOptimized")
-  if (!optimized || optimized.optimizedBullets.length === 0) return null
-  const quantifiedCount = optimized.optimizedBullets.filter((bullet) => /\d/.test(bullet)).length
-  return {
-    strength: Math.round((quantifiedCount / optimized.optimizedBullets.length) * 100),
-    optimizedCount: optimized.optimizedCount,
-    quantifiedCount,
+  if (optimized && optimized.optimizedBullets.length > 0) {
+    const quantifiedCount = optimized.optimizedBullets.filter((bullet) => /\d/.test(bullet)).length
+    return {
+      strength: Math.round((quantifiedCount / optimized.optimizedBullets.length) * 100),
+      optimizedCount: optimized.optimizedCount,
+      quantifiedCount,
+      source: "optimizer",
+    }
   }
+  // Fall back to the resume analyzer's achievement quality score when the
+  // optimizer hasn't run yet. Only shown when the resume actually contained
+  // achievements — never fabricated.
+  const resume = latestByType(events, "resumeAnalyzed")
+  const achievements = resume?.achievements ?? []
+  const achievementScore = resume?.sectionScores?.achievements
+  if (achievementScore !== undefined && achievementScore !== null && achievements.length > 0) {
+    return {
+      strength: Math.round(achievementScore),
+      optimizedCount: achievements.length,
+      quantifiedCount: achievements.filter((bullet) => /\d/.test(bullet)).length,
+      source: "analyzer",
+    }
+  }
+  return null
 }
 
-export function computeAchievementStrengthTrend(events: AnalyticsEvent[]): { value: string; positive: boolean } | null {
+export function computeAchievementStrengthTrend(events: AnalyticsEvent[]): {
+  value: string
+  positive: boolean
+  source: "optimizer" | "analyzer"
+} | null {
   const optimizedEvents = events
     .filter((event): event is BulletsOptimizedEvent => event.type === "bulletsOptimized")
     .sort((a, b) => a.timestamp - b.timestamp)
-  if (optimizedEvents.length < 2) return null
-  const strength = (event: BulletsOptimizedEvent) =>
-    event.optimizedBullets.length === 0
-      ? null
-      : Math.round((event.optimizedBullets.filter((bullet) => /\d/.test(bullet)).length / event.optimizedBullets.length) * 100)
-  const last = strength(optimizedEvents[optimizedEvents.length - 1])
-  const previous = strength(optimizedEvents[optimizedEvents.length - 2])
-  if (last === null || previous === null) return null
-  const delta = last - previous
-  return { value: `${delta >= 0 ? "+" : ""}${delta}`, positive: delta >= 0 }
+  if (optimizedEvents.length >= 2) {
+    const strength = (event: BulletsOptimizedEvent) =>
+      event.optimizedBullets.length === 0
+        ? null
+        : Math.round((event.optimizedBullets.filter((bullet) => /\d/.test(bullet)).length / event.optimizedBullets.length) * 100)
+    const last = strength(optimizedEvents[optimizedEvents.length - 1])
+    const previous = strength(optimizedEvents[optimizedEvents.length - 2])
+    if (last !== null && previous !== null) {
+      const delta = last - previous
+      return { value: `${delta >= 0 ? "+" : ""}${delta}`, positive: delta >= 0, source: "optimizer" }
+    }
+  }
+  // Analyzer-derived achievement trend (only when no optimizer runs exist).
+  const resumes = events
+    .filter((event): event is ResumeAnalyzedEvent => event.type === "resumeAnalyzed")
+    .filter((event) => event.sectionScores?.achievements !== undefined)
+    .sort((a, b) => a.timestamp - b.timestamp)
+  if (resumes.length >= 2) {
+    const last = resumes[resumes.length - 1].sectionScores?.achievements as number
+    const previous = resumes[resumes.length - 2].sectionScores?.achievements as number
+    const delta = last - previous
+    return { value: `${delta >= 0 ? "+" : ""}${delta}`, positive: delta >= 0, source: "analyzer" }
+  }
+  return null
 }
 
 /* -- Recruiter Shortlist -------------------------------------------- */

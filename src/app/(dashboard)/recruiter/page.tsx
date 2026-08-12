@@ -4,7 +4,7 @@ import { useState } from "react"
 import { recruiterShortlistProbability, RecruiterShortlistProbabilityOutput } from "@/ai/flows/recruiter-shortlist-probability"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UserCheck, Loader2, TrendingUp, Search } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
@@ -44,7 +44,7 @@ export default function RecruiterPage() {
         timestamp: Date.now(),
         shortlistProbability: output.shortlistProbability,
       })
-    } catch (error) {
+    } catch {
       toast({
         title: "Simulation failed",
         description: "An error occurred during recruiter behavior simulation.",
@@ -82,7 +82,7 @@ export default function RecruiterPage() {
                 <label className="text-xs font-headline uppercase text-muted-foreground">Resume Context</label>
                 <Textarea 
                   placeholder="Paste resume content..." 
-                  className="min-h-[200px] bg-background/50 border-white/10 text-sm"
+                  className="min-h-[200px] bg-background/50 border-foreground/10 text-sm"
                   value={resumeText}
                   onChange={(e) => setResumeText(e.target.value)}
                 />
@@ -91,7 +91,7 @@ export default function RecruiterPage() {
                 <label className="text-xs font-headline uppercase text-muted-foreground">Target Role Description</label>
                 <Textarea 
                   placeholder="Paste job description..." 
-                  className="min-h-[200px] bg-background/50 border-white/10 text-sm"
+                  className="min-h-[200px] bg-background/50 border-foreground/10 text-sm"
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
                 />
@@ -130,14 +130,14 @@ export default function RecruiterPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-6 p-6 rounded-xl bg-white/[0.03] border border-white/5">
+                  <div className="flex items-center gap-6 p-6 rounded-xl bg-foreground/[0.03] border border-foreground/5">
                     <div className="h-16 w-16 rounded-full border-4 border-primary/30 flex items-center justify-center">
                       <TrendingUp className="h-8 w-8 text-primary" />
                     </div>
                     <div>
                       <h4 className="font-headline font-bold text-lg mb-1">Recruiter Sentiment</h4>
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        Based on qualitative factors, a recruiter in this industry would likely categorize you as a <span className="text-white font-medium">{result.shortlistProbability}</span> priority candidate.
+                        Based on qualitative factors, a recruiter in this industry would likely categorize you as a <span className="text-foreground font-medium">{result.shortlistProbability}</span> priority candidate.
                       </p>
                     </div>
                   </div>
@@ -156,7 +156,7 @@ export default function RecruiterPage() {
               </Card>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-white/5 rounded-2xl opacity-50">
+            <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-foreground/5 rounded-2xl opacity-50">
               <UserCheck className="h-16 w-16 text-muted-foreground mb-6" strokeWidth={0.5} />
               <h3 className="text-xl font-headline font-medium mb-2">Simulate a Recruiter</h3>
               <p className="text-sm text-muted-foreground max-w-xs">

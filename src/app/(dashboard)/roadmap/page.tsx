@@ -114,11 +114,11 @@ function SectionCard({
 
 function SkillGapRow({ skill, currentLevel, requiredLevel, gap }: { skill: string; currentLevel: number; requiredLevel: number; gap: string }) {
   return (
-    <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+    <div className="rounded-xl border border-foreground/5 bg-foreground/[0.03] p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-foreground">{skill}</p>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="border-white/10 text-muted-foreground">
+          <Badge variant="outline" className="border-foreground/10 text-muted-foreground">
             {currentLevel}%
           </Badge>
           <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
@@ -130,11 +130,11 @@ function SkillGapRow({ skill, currentLevel, requiredLevel, gap }: { skill: strin
       <div className="mt-3 space-y-2">
         <div className="flex items-center gap-3">
           <span className="w-10 shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground">Now</span>
-          <Progress value={currentLevel} className="h-1.5 bg-white/5 [&>div]:bg-muted-foreground/60" />
+          <Progress value={currentLevel} className="h-1.5 bg-foreground/5 [&>div]:bg-muted-foreground/60" />
         </div>
         <div className="flex items-center gap-3">
           <span className="w-10 shrink-0 text-[10px] uppercase tracking-wider text-primary">Goal</span>
-          <Progress value={requiredLevel} className="h-1.5 bg-white/5" />
+          <Progress value={requiredLevel} className="h-1.5 bg-foreground/5" />
         </div>
       </div>
       <p className="mt-3 text-xs leading-5 text-muted-foreground">{gap}</p>
@@ -329,7 +329,7 @@ export default function RoadmapPage() {
                     value={setup.currentEducation}
                     onChange={(event) => setSetup((current) => ({ ...current, currentEducation: event.target.value }))}
                     placeholder="e.g. B.Tech in Computer Science (2023), self-taught web developer"
-                    className="min-h-[80px] resize-y bg-background/50 border-white/10 text-sm leading-relaxed"
+                    className="min-h-[80px] resize-y bg-background/50 border-foreground/10 text-sm leading-relaxed"
                   />
                 </div>
                 <div className="space-y-2">
@@ -338,14 +338,14 @@ export default function RoadmapPage() {
                     value={setup.currentSkills}
                     onChange={(event) => setSetup((current) => ({ ...current, currentSkills: event.target.value }))}
                     placeholder="e.g. Python, JavaScript, SQL, Git, basic data structures"
-                    className="min-h-[80px] resize-y bg-background/50 border-white/10 text-sm leading-relaxed"
+                    className="min-h-[80px] resize-y bg-background/50 border-foreground/10 text-sm leading-relaxed"
                   />
                 </div>
                 <div className="grid gap-6 sm:grid-cols-3">
                   <div className="space-y-2">
                     <label className="text-xs font-headline uppercase tracking-widest text-muted-foreground">Experience</label>
                     <Select value={setup.experience} onValueChange={(value) => setSetup((current) => ({ ...current, experience: value }))}>
-                      <SelectTrigger className="h-11 border-white/10 bg-background/50 font-headline">
+                      <SelectTrigger className="h-11 border-foreground/10 bg-background/50 font-headline">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -360,7 +360,7 @@ export default function RoadmapPage() {
                   <div className="space-y-2">
                     <label className="text-xs font-headline uppercase tracking-widest text-muted-foreground">Target Career</label>
                     <Select value={setup.targetCareer} onValueChange={(value) => setSetup((current) => ({ ...current, targetCareer: value }))}>
-                      <SelectTrigger className="h-11 border-white/10 bg-background/50 font-headline">
+                      <SelectTrigger className="h-11 border-foreground/10 bg-background/50 font-headline">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -375,7 +375,7 @@ export default function RoadmapPage() {
                   <div className="space-y-2">
                     <label className="text-xs font-headline uppercase tracking-widest text-muted-foreground">Time Commitment</label>
                     <Select value={setup.timeCommitment} onValueChange={(value) => setSetup((current) => ({ ...current, timeCommitment: value }))}>
-                      <SelectTrigger className="h-11 border-white/10 bg-background/50 font-headline">
+                      <SelectTrigger className="h-11 border-foreground/10 bg-background/50 font-headline">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -426,7 +426,7 @@ export default function RoadmapPage() {
               {error}
             </div>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={startOver} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={startOver} className="border-foreground/10 hover:bg-foreground/5">
                 Back to Setup
               </Button>
               <Button type="button" size="sm" onClick={() => generate()} className="font-headline">
@@ -443,23 +443,23 @@ export default function RoadmapPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">{setup.targetCareer}</Badge>
-              <Badge variant="outline" className="border-white/10">{setup.experience}</Badge>
-              <Badge variant="outline" className="border-white/10">{setup.timeCommitment}</Badge>
+              <Badge variant="outline" className="border-foreground/10">{setup.experience}</Badge>
+              <Badge variant="outline" className="border-foreground/10">{setup.timeCommitment}</Badge>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={downloadPdf} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={downloadPdf} className="border-foreground/10 hover:bg-foreground/5">
                 <Download className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 Download PDF
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={copyRoadmap} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={copyRoadmap} className="border-foreground/10 hover:bg-foreground/5">
                 <ClipboardCopy className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 Copy Roadmap
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => generate(setup)} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={() => generate(setup)} className="border-foreground/10 hover:bg-foreground/5">
                 <RefreshCw className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 Regenerate
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={startOver} className="border-white/10 hover:bg-white/5">
+              <Button type="button" variant="outline" size="sm" onClick={startOver} className="border-foreground/10 hover:bg-foreground/5">
                 <Map className="mr-2 h-4 w-4" strokeWidth={1.5} />
                 New Roadmap
               </Button>
@@ -491,7 +491,7 @@ export default function RoadmapPage() {
               <CardContent className="flex flex-col items-center justify-center gap-3 py-4">
                 <div className="relative flex h-36 w-36 items-center justify-center">
                   <svg className="h-full w-full rotate-[-90deg]">
-                    <circle cx="72" cy="72" r="66" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-white/5" />
+                    <circle cx="72" cy="72" r="66" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-foreground/5" />
                     <circle
                       cx="72"
                       cy="72"
@@ -534,7 +534,7 @@ export default function RoadmapPage() {
                   <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-[10px] font-bold text-primary">
                     {week.week}
                   </span>
-                  <div className="flex-1 rounded-xl border border-white/5 bg-white/[0.03] p-4">
+                  <div className="flex-1 rounded-xl border border-foreground/5 bg-foreground/[0.03] p-4">
                     <p className="text-sm font-headline font-semibold text-foreground">{week.focus}</p>
                     <ul className="mt-2 space-y-1.5">
                       {week.tasks.map((task, taskIndex) => (
@@ -553,7 +553,7 @@ export default function RoadmapPage() {
           {/* Monthly milestones checklist */}
           <SectionCard icon={Flag} title="Monthly Milestones" description="Check off each milestone as you complete it.">
             <div className="mb-4 flex items-center gap-4">
-              <Progress value={(completedMilestones / Math.max(report.monthlyMilestones.length, 1)) * 100} className="h-1.5 bg-white/5" />
+              <Progress value={(completedMilestones / Math.max(report.monthlyMilestones.length, 1)) * 100} className="h-1.5 bg-foreground/5" />
               <span className="shrink-0 text-xs text-muted-foreground">{completedMilestones} / {report.monthlyMilestones.length} complete</span>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -564,7 +564,7 @@ export default function RoadmapPage() {
                   <div
                     key={milestoneId}
                     className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors duration-200 ${
-                      checked ? "border-primary/30 bg-primary/5" : "border-white/5 bg-white/[0.03] hover:bg-white/[0.06]"
+                      checked ? "border-primary/30 bg-primary/5" : "border-foreground/5 bg-foreground/[0.03] hover:bg-foreground/[0.06]"
                     }`}
                   >
                     <Checkbox
@@ -589,10 +589,10 @@ export default function RoadmapPage() {
           <SectionCard icon={Briefcase} title="Practice Projects" description="Realistic projects that demonstrate your growth to employers.">
             <div className="grid gap-3 md:grid-cols-2">
               {report.projects.map((project, index) => (
-                <div key={`project-${index}`} className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+                <div key={`project-${index}`} className="rounded-xl border border-foreground/5 bg-foreground/[0.03] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-headline font-semibold text-foreground">{project.name}</p>
-                    <Badge variant="outline" className="border-white/10 text-muted-foreground">{project.difficulty}</Badge>
+                    <Badge variant="outline" className="border-foreground/10 text-muted-foreground">{project.difficulty}</Badge>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{project.description}</p>
                 </div>
@@ -605,7 +605,7 @@ export default function RoadmapPage() {
             <SectionCard icon={BookOpen} title="Courses" description="Recommended learning resources.">
               <div className="space-y-3">
                 {report.courses.map((course, index) => (
-                  <div key={`course-${index}`} className="rounded-xl border border-white/5 bg-white/[0.03] p-3.5">
+                  <div key={`course-${index}`} className="rounded-xl border border-foreground/5 bg-foreground/[0.03] p-3.5">
                     <p className="text-sm font-medium text-foreground">{course.title}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{course.provider}</p>
                   </div>
@@ -615,7 +615,7 @@ export default function RoadmapPage() {
             <SectionCard icon={Library} title="Books" description="Books worth reading along the way.">
               <div className="space-y-3">
                 {report.books.map((book, index) => (
-                  <div key={`book-${index}`} className="rounded-xl border border-white/5 bg-white/[0.03] p-3.5">
+                  <div key={`book-${index}`} className="rounded-xl border border-foreground/5 bg-foreground/[0.03] p-3.5">
                     <p className="text-sm font-medium text-foreground">{book.title}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{book.provider}</p>
                   </div>
@@ -625,7 +625,7 @@ export default function RoadmapPage() {
             <SectionCard icon={Award} title="Certifications" description="Only real, verifiable certifications.">
               <div className="space-y-3">
                 {report.certifications.map((cert, index) => (
-                  <div key={`cert-${index}`} className="rounded-xl border border-white/5 bg-white/[0.03] p-3.5">
+                  <div key={`cert-${index}`} className="rounded-xl border border-foreground/5 bg-foreground/[0.03] p-3.5">
                     <p className="text-sm font-medium text-foreground">{cert.title}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{cert.provider}</p>
                   </div>
@@ -638,7 +638,7 @@ export default function RoadmapPage() {
           <SectionCard icon={Lightbulb} title="Interview Preparation" description="How to turn your learning into an offer.">
             <div className="grid gap-3">
               {report.interviewPreparation.map((item, index) => (
-                <div key={`interview-${index}`} className="flex gap-4 rounded-xl border border-white/5 bg-white/[0.03] p-4">
+                <div key={`interview-${index}`} className="flex gap-4 rounded-xl border border-foreground/5 bg-foreground/[0.03] p-4">
                   <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                     {index + 1}
                   </span>
