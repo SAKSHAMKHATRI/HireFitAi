@@ -1,17 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   AlertCircle,
+  Download,
   FileCheck2,
   Gauge,
+  History,
   Loader2,
   RotateCcw,
   Target,
   X,
 } from "lucide-react"
 
-import { matchResumeToJob, type MatchResumeToJobOutput } from "@/ai/flows/match-resume-to-job-flow"
+import { matchResumeToJob } from "@/ai/flows/match-resume-to-job-flow"
+import { JdLibraryPanel } from "@/components/match/jd-library-panel"
 import { ListCard, NumberedCard } from "@/components/match/match-cards"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { ResumePdfUploader } from "@/components/resume/resume-pdf-uploader"
@@ -21,7 +24,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { useResumePdfUpload } from "@/hooks/use-resume-pdf-upload"
-import { recordActivity } from "@/lib/analytics"
+import { recordActivity, formatEventTimestamp } from "@/lib/analytics"
+import { toast } from "@/hooks/use-toast"
+import { auth } from "@/lib/firebase"
+import {
+  fetchMyJobMatches,
+  fetchMyResumeAnalyses,
+  type AnalysisRecord,
+} from "@/lib/firebase-firestore"
+import { selectMatchRecordsForAnalysis } from "@/lib/match-selection"
+import {
+  buildMatchReportMarkdown,
+  extractCandidateName,
+  normalizeMatchResult,
+  type NormalizedMatch,
+} from "@/lib/match-report"
 import { fileToDataUri, friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 
 const matchTimeoutMs = 60000
@@ -34,18 +51,92 @@ export default function MatchPage() {
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState("")
   const [status, setStatus] = useState<MatchStatus>("idle")
-  const [result, setResult] = useState<MatchResumeToJobOutput | null>(null)
+  const [result, setResult] = useState<NormalizedMatch | null>(null)
+  const [matchDate, setMatchDate] = useState<number | null>(null)
+  /** Id of the match record currently displayed (fresh run or restored). */
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
+  /** The active resume analysis the current match belongs to. */
+  const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null)
+  /** Previous match reports for the active analysis, newest first. */
+  const [matchHistory, setMatchHistory] = useState<AnalysisRecord[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const upload = useResumePdfUpload(() => {
     setProgress(0)
     setError("")
     setStatus("idle")
     setResult(null)
+    setMatchDate(null)
+    setActiveHistoryId(null)
   })
+
+  /**
+   * Loads the active (latest) resume analysis and its match history, then
+   * opens with the newest match displayed. Reuses the same analysis↔match
+   * selection rules as the Resume Analyzer. Never calls Gemini.
+   */
+  const refreshHistory = useCallback(async () => {
+    const uid = auth.currentUser?.uid
+    if (!uid) {
+      setHistoryLoading(false)
+      return
+    }
+    try {
+      const [analyses, matches] = await Promise.all([
+        fetchMyResumeAnalyses(uid),
+        fetchMyJobMatches(uid),
+      ])
+      const latest = analyses.find((record) => record.result !== undefined) ?? null
+      setAnalysis(latest)
+      const history = selectMatchRecordsForAnalysis(matches, latest)
+      setMatchHistory(history as AnalysisRecord[])
+      // Open with the newest historical match — restoring never re-runs AI
+      // and never creates a new record.
+      const newest = history[0]
+      if (newest) {
+        const restored = normalizeMatchResult(newest.result)
+        if (restored) {
+          setResult(restored)
+          setMatchDate(newest.createdAt ?? null)
+          setActiveHistoryId(newest.id)
+          setStatus("complete")
+          if (typeof newest.jobDescription === "string" && newest.jobDescription.trim()) {
+            setJobDescription(newest.jobDescription)
+          }
+        }
+      }
+    } catch {
+      // History is best-effort — the module works without it.
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshHistory()
+  }, [refreshHistory])
+
+  /** Restores a historical match report without calling AI or saving anything. */
+  const restoreMatch = (record: AnalysisRecord) => {
+    if (status === "uploading" || status === "analyzing") return
+    const restored = normalizeMatchResult(record.result)
+    if (!restored) return
+    setError("")
+    setResult(restored)
+    setMatchDate(record.createdAt ?? null)
+    setActiveHistoryId(record.id)
+    setStatus("complete")
+    if (typeof record.jobDescription === "string" && record.jobDescription.trim()) {
+      setJobDescription(record.jobDescription)
+    }
+  }
 
   const clearJobDescription = () => {
     setJobDescription("")
     setError("")
     setResult(null)
+    setMatchDate(null)
+    setActiveHistoryId(null)
     setStatus(upload.file ? "idle" : status)
     setProgress(0)
   }
@@ -55,6 +146,48 @@ export default function MatchPage() {
     setError("")
     setStatus("idle")
     setResult(null)
+    setMatchDate(null)
+    setActiveHistoryId(null)
+  }
+
+  /** Exports the displayed match report as DOCX via the existing export route. */
+  const exportMatchReport = async () => {
+    if (!result || exporting) return
+    setExporting(true)
+    try {
+      const markdown = buildMatchReportMarkdown(result, {
+        candidateName: extractCandidateName(analysis?.result),
+        jobDescription: jobDescription.trim() || undefined,
+        analysisDate: analysis?.createdAt ?? undefined,
+        matchDate: matchDate ?? undefined,
+      })
+      const response = await withTimeout(
+        fetch("/api/reports/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markdown, filename: "hirefit-match-report" }),
+        }),
+        30000,
+        "Report export timed out. Please try again."
+      )
+      if (!response.ok) throw new Error("Export failed")
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "hirefit-match-report.docx"
+      link.click()
+      URL.revokeObjectURL(url)
+      toast({ title: "Match report exported", description: "Your match report was downloaded as a Word document." })
+    } catch {
+      toast({
+        title: "Export failed",
+        description: "Could not create the DOCX file. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(false)
+    }
   }
 
   const analyzeMatch = async () => {
@@ -76,6 +209,8 @@ export default function MatchPage() {
 
     setError("")
     setResult(null)
+    setMatchDate(null)
+    setActiveHistoryId(null)
     setStatus("uploading")
     setProgress(18)
 
@@ -95,24 +230,37 @@ export default function MatchPage() {
           "Resume matching timed out. Please try again with a shorter Job Description."
         )
         window.clearInterval(progressTimer)
-        setResult(output)
+        const normalized = normalizeMatchResult(output)
+        if (!normalized) throw new Error("Gemini returned an unreadable match report. Please try again.")
+        const now = Date.now()
+        setResult(normalized)
+        setMatchDate(now)
         setProgress(100)
         setStatus("complete")
-        recordActivity(
+        // Persist the full report so it survives a refresh everywhere (the
+        // Resume Analyzer restores it from Firestore), linked to the active
+        // resume analysis so it appears in this analysis's match history.
+        await recordActivity(
           {
             type: "jobMatched",
-            timestamp: Date.now(),
-            matchScore: output.matchScore,
-            atsCompatibility: output.atsCompatibility,
-            matchedSkills: output.matchedSkills,
-            missingSkills: output.missingSkills,
-            matchedKeywords: output.matchedKeywords,
-            missingKeywords: output.missingKeywords,
+            timestamp: now,
+            matchScore: normalized.matchScore,
+            atsCompatibility: normalized.atsCompatibility,
+            matchedSkills: normalized.matchedSkills,
+            missingSkills: normalized.missingSkills,
+            matchedKeywords: normalized.matchedKeywords,
+            missingKeywords: normalized.missingKeywords,
           },
-          // Persist the full report so it survives a page refresh everywhere
-          // (the Resume Analyzer restores it from Firestore).
-          { fileName: upload.file?.name, result: output }
+          {
+            fileName: upload.file?.name,
+            result: output,
+            analysisId: analysis?.id ?? undefined,
+            jobDescription: trimmedDescription,
+          }
         )
+        // Refresh history so the new report appears under Previous Match
+        // Reports (Firestore pending writes are visible to the next read).
+        await refreshHistory()
       } catch (matchError) {
         window.clearInterval(progressTimer)
         throw matchError
@@ -220,6 +368,16 @@ export default function MatchPage() {
         </div>
       </div>
 
+      {/* Job Description Library — shared with the Resume Analyzer */}
+      <JdLibraryPanel
+        currentJobDescription={jobDescription}
+        onLoad={(loadedJd) => {
+          setJobDescription(loadedJd)
+          setError("")
+        }}
+        disabled={status === "uploading" || status === "analyzing"}
+      />
+
       {status === "analyzing" ? (
         <Card className="glass-card border-primary/20">
           <CardContent className="flex flex-col gap-4 p-6">
@@ -234,6 +392,15 @@ export default function MatchPage() {
 
       {result ? (
         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-headline text-xl font-semibold">Current Match</h2>
+            {activeHistoryId ? (
+              <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">Restored from history</Badge>
+            ) : (
+              <Badge variant="outline" className="border-primary/30 text-primary">Latest run</Badge>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <MetricCard title="Match Score" value={`${result.matchScore}%`} description="Overall role compatibility" icon={Target} trend={{ value: "Live", positive: true }} />
             <MetricCard title="ATS Compatibility" value={`${result.atsCompatibility}%`} description="Keyword and structure alignment" icon={Gauge} trend={{ value: "Gemini", positive: true }} />
@@ -245,13 +412,34 @@ export default function MatchPage() {
                 <CardTitle className="text-sm font-headline tracking-widest uppercase">Recruiter Summary</CardTitle>
                 <CardDescription>Compatibility report grounded only in the resume and job description.</CardDescription>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={resetMatch} className="border-foreground/10 hover:bg-foreground/5">
-                <RotateCcw className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                Reset Results
-              </Button>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void exportMatchReport()}
+                  disabled={exporting}
+                  className="border-foreground/10 hover:bg-foreground/5"
+                >
+                  {exporting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                  )}
+                  Export Report
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={resetMatch} className="border-foreground/10 hover:bg-foreground/5">
+                  <RotateCcw className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                  Reset Results
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-7 text-muted-foreground">{result.recruiterSummary}</p>
+              {result.recruiterSummary ? (
+                <p className="text-sm leading-7 text-muted-foreground">{result.recruiterSummary}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">No recruiter summary could be generated.</p>
+              )}
             </CardContent>
           </Card>
 
@@ -274,6 +462,90 @@ export default function MatchPage() {
           </div>
         </div>
       ) : null}
+
+      {/* Previous Match Reports — per-analysis history for the active analysis */}
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm font-headline tracking-widest uppercase">
+            <History className="h-4 w-4 text-primary" strokeWidth={1.5} />
+            Previous Match Reports
+          </CardTitle>
+          <CardDescription>
+            Past AI Match results for your current resume analysis. Restoring one never re-runs Gemini and never creates a new record.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {historyLoading ? (
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" strokeWidth={1.5} />
+              Loading previous match reports...
+            </div>
+          ) : !analysis ? (
+            <div className="rounded-xl border border-dashed border-foreground/10 p-6 text-center">
+              <History className="mx-auto mb-2 h-6 w-6 text-muted-foreground/50" strokeWidth={1} />
+              <p className="text-sm font-medium">No resume analysis selected</p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-muted-foreground">
+                Run a resume analysis in the Resume Analyzer first — match reports are grouped by the resume analysis they were computed against.
+              </p>
+            </div>
+          ) : matchHistory.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-foreground/10 p-6 text-center">
+              <History className="mx-auto mb-2 h-6 w-6 text-muted-foreground/50" strokeWidth={1} />
+              <p className="text-sm font-medium">No previous match reports</p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-muted-foreground">
+                Run AI Match once and the report is saved here automatically, ready to restore or export.
+              </p>
+            </div>
+          ) : (
+            <ul className="grid gap-2">
+              {matchHistory.map((record) => {
+                const current = record.id === activeHistoryId
+                const restored = normalizeMatchResult(record.result)
+                const jdLabel =
+                  typeof record.jobDescription === "string" && record.jobDescription.trim()
+                    ? record.jobDescription.trim().slice(0, 60)
+                    : "Match report"
+                return (
+                  <li
+                    key={record.id}
+                    className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 transition-colors ${
+                      current
+                        ? "border-primary/30 bg-primary/5"
+                        : "border-foreground/5 bg-foreground/[0.02]"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{jdLabel}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {formatEventTimestamp(record.createdAt ?? 0)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      {record.matchScore !== undefined ? (
+                        <Badge variant="outline" className="border-primary/30 text-primary">Match {record.matchScore}%</Badge>
+                      ) : null}
+                      {record.atsCompatibility !== undefined ? (
+                        <Badge variant="outline" className="border-foreground/20 text-muted-foreground">ATS {record.atsCompatibility}%</Badge>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-foreground/10"
+                        disabled={current || !restored || status === "uploading" || status === "analyzing"}
+                        onClick={() => restoreMatch(record)}
+                      >
+                        {current ? <FileCheck2 className="mr-1.5 h-4 w-4" strokeWidth={1.5} /> : <History className="mr-1.5 h-4 w-4" strokeWidth={1.5} />}
+                        {current ? "Viewing" : restored ? "View" : "Unavailable"}
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {status === "error" && error ? (
         <Card className="glass-card border-red-500/20">

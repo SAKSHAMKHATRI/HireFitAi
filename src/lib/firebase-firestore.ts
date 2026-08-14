@@ -170,6 +170,10 @@ export type AnalysisRecord = {
   companyName?: string
   skills?: string[]
   createdAt: number
+  /** Id of the source resume analysis record an AI Match was computed against. */
+  analysisId?: string
+  /** Job description used for an AI Match run (restored alongside the result). */
+  jobDescription?: string
   [key: string]: unknown
 }
 
@@ -269,6 +273,7 @@ export const savedRecordTypes = {
   coverLetter: "cover-letter",
   coachHistory: "coach-history",
   interviewProgress: "interview-progress",
+  jobDescriptions: "job-descriptions",
 } as const
 
 type SavedRecordType = (typeof savedRecordTypes)[keyof typeof savedRecordTypes]

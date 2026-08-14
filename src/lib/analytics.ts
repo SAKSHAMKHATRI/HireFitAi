@@ -199,9 +199,9 @@ export function loadAnalytics(): AnalyticsEvent[] {
 
 export function recordActivity(
   event: AnalyticsEvent,
-  meta?: { fileName?: string; result?: unknown }
-): void {
-  if (typeof window === "undefined") return
+  meta?: { fileName?: string; result?: unknown; analysisId?: string; jobDescription?: string }
+): Promise<string | null> | undefined {
+  if (typeof window === "undefined") return undefined
   try {
     const current = loadAnalytics()
     current.push(event)
@@ -213,10 +213,12 @@ export function recordActivity(
     // Analytics must never break the module that produced the event.
   }
   // Mirror the event into Firestore (Phase 5) so admins can see real module
-  // activity. Fire-and-forget: failures never surface in the module UI.
-  void import("@/lib/firebase-analytics")
+  // activity. Fire-and-forget for callers that ignore the promise; callers
+  // may await it to learn the created analysis record id (used to link AI
+  // Match results back to their source resume analysis). Never rejects.
+  return import("@/lib/firebase-analytics")
     .then(({ persistAnalysisEvent }) => persistAnalysisEvent(event, meta))
-    .catch(() => {})
+    .catch(() => null)
 }
 
 /* ------------------------------------------------------------------ */

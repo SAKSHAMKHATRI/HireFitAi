@@ -7,6 +7,7 @@ import {
   Award,
   Boxes,
   Briefcase,
+  Download,
   FileCheck2,
   FileText,
   Gauge,
@@ -28,6 +29,7 @@ import {
 import { analyzeResume } from "@/ai/flows/analyze-resume-flow"
 import { matchResumeToJob } from "@/ai/flows/match-resume-to-job-flow"
 import { ListCard, NumberedCard } from "@/components/match/match-cards"
+import { JdLibraryPanel } from "@/components/match/jd-library-panel"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { ResumePdfUploader } from "@/components/resume/resume-pdf-uploader"
 import { Badge } from "@/components/ui/badge"
@@ -38,9 +40,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { useResumePdfUpload } from "@/hooks/use-resume-pdf-upload"
 import { recordActivity, formatEventTimestamp } from "@/lib/analytics"
 import { auth } from "@/lib/firebase"
+import { buildMatchReportMarkdown } from "@/lib/match-report"
 import { fetchMyJobMatches, fetchMyResumeAnalyses, type AnalysisRecord } from "@/lib/firebase-firestore"
+import { selectMatchRecordForAnalysis } from "@/lib/match-selection"
 import { fileToDataUri, friendlyErrorMessage, withTimeout } from "@/lib/resume-upload"
 import { cn } from "@/lib/utils"
+import { toast } from "@/hooks/use-toast"
 
 const analysisTimeoutMs = 45000
 const matchTimeoutMs = 60000
@@ -327,6 +332,7 @@ export default function AnalyzerPage() {
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
   const [history, setHistory] = useState<AnalysisRecord[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [matchHistory, setMatchHistory] = useState<AnalysisRecord[]>([])
 
   // AI Match state (tied to the currently analyzed resume).
   const [jobDescription, setJobDescription] = useState("")
@@ -334,12 +340,15 @@ export default function AnalyzerPage() {
   const [matchResult, setMatchResult] = useState<NormalizedMatch | null>(null)
   const [matchError, setMatchError] = useState("")
   const [matchDate, setMatchDate] = useState<number | null>(null)
+  const [exportingMatch, setExportingMatch] = useState(false)
 
   const processingRef = useRef(false)
   const matchProcessingRef = useRef(false)
   const mountedRef = useRef(true)
   /** Data URI of the successfully analyzed resume, reused by AI Match. */
   const resumeDataUriRef = useRef<string | null>(null)
+  /** Firestore id of the currently displayed resume analysis record. */
+  const analysisRecordIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     mountedRef.current = true
@@ -365,6 +374,7 @@ export default function AnalyzerPage() {
         ])
         if (cancelled) return
         setHistory(records)
+        setMatchHistory(matchRecords)
         // Never clobber an analysis the user has already started while the
         // history fetch is still in flight.
         if (processingRef.current) return
@@ -379,16 +389,21 @@ export default function AnalyzerPage() {
             setStatus("complete")
           }
         }
-        // Restore the latest saved AI Match only when it belongs to the
-        // analysis being shown — a match older than the current analysis was
-        // computed against an earlier resume and must not be displayed.
-        const analysisTs = latest?.createdAt ?? null
-        const latestMatch = matchRecords.find((record) => record.result !== undefined && normalizeMatch(record.result) !== null)
-        if (analysisTs !== null && latestMatch && (latestMatch.createdAt ?? 0) >= analysisTs) {
-          const restoredMatch = normalizeMatch(latestMatch.result)
+        // Restore the AI Match that belongs to the analysis being shown. New
+        // match records carry an explicit analysisId link; legacy records
+        // fall back to a conservative timestamp rule — a match computed
+        // against an earlier or different resume is never shown next to an
+        // analysis it does not belong to.
+        const linkedMatch = selectMatchRecordForAnalysis(matchRecords, latest)
+        if (linkedMatch) {
+          const restoredMatch = normalizeMatch(linkedMatch.result)
           if (restoredMatch) {
             setMatchResult(restoredMatch)
-            setMatchDate(latestMatch.createdAt ?? null)
+            setMatchDate(linkedMatch.createdAt ?? null)
+            setMatchStatus("complete")
+            if (typeof linkedMatch.jobDescription === "string" && linkedMatch.jobDescription.trim()) {
+              setJobDescription(linkedMatch.jobDescription)
+            }
           }
         }
       } catch {
@@ -418,6 +433,7 @@ export default function AnalyzerPage() {
     // A new analysis invalidates any previous match (it was computed against
     // an earlier resume) and the previous PDF is no longer current.
     resumeDataUriRef.current = null
+    analysisRecordIdRef.current = null
     setMatchStatus("idle")
     setMatchResult(null)
     setMatchDate(null)
@@ -453,21 +469,33 @@ export default function AnalyzerPage() {
         setAnalysisDate(now)
         setProgress(100)
         setStatus("complete")
-        recordActivity(
-          {
-            type: "resumeAnalyzed",
-            timestamp: now,
-            atsScore: normalized.atsScore,
-            keywordCoverage: normalized.keywordCoverage,
-            sectionScores: normalized.sectionScores ?? undefined,
-            achievements: normalized.achievements,
-            candidateName: normalized.candidateInfo.name || undefined,
-            technicalSkills: normalized.technicalSkills,
-            softSkills: normalized.softSkills,
-            missingSkills: normalized.missingSkills,
-          },
-          { fileName: selectedFile.name, result: toPersistedResult(output) }
-        )
+        // Persist the analysis and capture its record id so an AI Match can
+        // be explicitly linked back to this analysis. Best-effort: if the
+        // write fails the module still works and matches fall back to the
+        // legacy timestamp heuristic.
+        let analysisRecordId: string | null = null
+        try {
+          analysisRecordId =
+            (await recordActivity(
+              {
+                type: "resumeAnalyzed",
+                timestamp: now,
+                atsScore: normalized.atsScore,
+                keywordCoverage: normalized.keywordCoverage,
+                sectionScores: normalized.sectionScores ?? undefined,
+                achievements: normalized.achievements,
+                candidateName: normalized.candidateInfo.name || undefined,
+                technicalSkills: normalized.technicalSkills,
+                softSkills: normalized.softSkills,
+                missingSkills: normalized.missingSkills,
+              },
+              { fileName: selectedFile.name, result: toPersistedResult(output) }
+            )) ?? null
+        } catch {
+          analysisRecordId = null
+        }
+        analysisRecordIdRef.current = analysisRecordId
+        if (analysisRecordId) setActiveHistoryId(analysisRecordId)
       } catch (analysisError) {
         if (progressTimer !== null) window.clearInterval(progressTimer)
         throw analysisError
@@ -489,6 +517,10 @@ export default function AnalyzerPage() {
     matchDate !== null &&
     analysisDate !== null &&
     matchDate >= analysisDate
+  // An analysis with no match result (and no match currently running) is
+  // honestly labelled "Not analyzed" — never fabricated historical data.
+  const matchNotRun =
+    analysis !== null && matchResult === null && matchStatus !== "matching"
   const matchCanRun = Boolean(resumeDataUriRef.current)
   const rating = analysis ? atsRating(analysis.atsScore) : null
   const hasContact = analysis
@@ -504,17 +536,34 @@ export default function AnalyzerPage() {
     const restored = normalizeAnalysis(record.result)
     if (!restored) return
     setError("")
-    // A saved match belongs to the newest resume — clear it when viewing an
-    // older analysis rather than showing mismatched data.
-    setMatchResult(null)
-    setMatchDate(null)
-    setMatchStatus("idle")
-    setMatchError("")
     setAnalysis(restored)
     setAnalysisDate(record.createdAt ?? null)
     setActiveHistoryId(record.id)
     setProgress(100)
     setStatus("complete")
+
+    // Restore the AI Match linked to this specific analysis (if one was ever
+    // run against this resume). Legacy records without a link resolve to
+    // null, which correctly clears any stale match state instead of showing
+    // a match computed against a different resume.
+    const linked = selectMatchRecordForAnalysis(matchHistory, record)
+    if (linked) {
+      const restoredMatch = normalizeMatch(linked.result)
+      if (restoredMatch) {
+        setMatchResult(restoredMatch)
+        setMatchDate(linked.createdAt ?? null)
+        setMatchStatus("complete")
+        setMatchError("")
+        if (typeof linked.jobDescription === "string") {
+          setJobDescription(linked.jobDescription)
+        }
+        return
+      }
+    }
+    setMatchResult(null)
+    setMatchDate(null)
+    setMatchStatus("idle")
+    setMatchError("")
   }
 
   const runMatch = async () => {
@@ -562,7 +611,14 @@ export default function AnalyzerPage() {
           matchedKeywords: normalized.matchedKeywords,
           missingKeywords: normalized.missingKeywords,
         },
-        { fileName: upload.file?.name, result: output }
+        {
+          fileName: upload.file?.name,
+          result: output,
+          // Link this match to the resume analysis it was computed against so
+          // the correct match is restored next to the correct analysis.
+          analysisId: analysisRecordIdRef.current ?? undefined,
+          jobDescription: trimmedDescription,
+        }
       )
     } catch (matchFailure) {
       if (mountedRef.current) {
@@ -580,6 +636,48 @@ export default function AnalyzerPage() {
     setMatchDate(null)
     setMatchStatus("idle")
     setMatchError("")
+  }
+
+  // Exports the currently displayed match result (owner-scoped, already
+  // loaded from Firestore) as a DOCX via the existing /api/reports/export.
+  // Only present data is included — nothing is fabricated.
+  const exportMatchReport = async () => {
+    if (!matchResult || exportingMatch) return
+    setExportingMatch(true)
+    try {
+      const markdown = buildMatchReportMarkdown(matchResult, {
+        candidateName: analysis?.candidateInfo.name || undefined,
+        jobDescription: jobDescription.trim() || undefined,
+        analysisDate: analysisDate ?? undefined,
+        matchDate: matchDate ?? undefined,
+      })
+      const response = await withTimeout(
+        fetch("/api/reports/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markdown, filename: "hirefit-match-report" }),
+        }),
+        30000,
+        "Report export timed out. Please try again."
+      )
+      if (!response.ok) throw new Error("Export failed")
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "hirefit-match-report.docx"
+      link.click()
+      URL.revokeObjectURL(url)
+      toast({ title: "Match report exported", description: "Your match report was downloaded as a Word document." })
+    } catch {
+      toast({
+        title: "Export failed",
+        description: "Could not create the DOCX file. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setExportingMatch(false)
+    }
   }
 
   return (
@@ -609,6 +707,7 @@ export default function AnalyzerPage() {
               setAnalysisDate(null)
               setActiveHistoryId(null)
               resumeDataUriRef.current = null
+              analysisRecordIdRef.current = null
               setMatchStatus("idle")
               setMatchResult(null)
               setMatchDate(null)
@@ -721,7 +820,11 @@ export default function AnalyzerPage() {
                   <CardTitle className="text-sm font-headline tracking-widest uppercase">AI Match</CardTitle>
                   <CardDescription>Compare this analyzed resume against a job description with Gemini.</CardDescription>
                 </div>
-                {showMatchResult ? <Badge variant="outline" className="border-primary/30 text-primary">Matched</Badge> : null}
+                {showMatchResult ? (
+                  <Badge variant="outline" className="border-primary/30 text-primary">Matched</Badge>
+                ) : matchNotRun ? (
+                  <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">Not analyzed</Badge>
+                ) : null}
               </CardHeader>
               <CardContent className="space-y-4">
                 {matchCanRun ? (
@@ -746,6 +849,7 @@ export default function AnalyzerPage() {
                         setJobDescription(event.target.value)
                         setMatchError("")
                       }}
+                      aria-label="Job Description"
                       placeholder="Paste the complete Job Description here..."
                       className="min-h-[200px] resize-y border-foreground/10 bg-background/50 text-sm leading-relaxed"
                     />
@@ -791,6 +895,16 @@ export default function AnalyzerPage() {
               </CardContent>
             </Card>
 
+            {/* JD Library — reuse saved job descriptions without re-typing */}
+            <JdLibraryPanel
+              currentJobDescription={jobDescription}
+              onLoad={(loadedJd) => {
+                setJobDescription(loadedJd)
+                setMatchError("")
+              }}
+              disabled={processing}
+            />
+
             {showMatchResult && matchResult ? (
               <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -816,10 +930,27 @@ export default function AnalyzerPage() {
                       <CardTitle className="text-sm font-headline tracking-widest uppercase">Recruiter Summary</CardTitle>
                       <CardDescription>Compatibility report grounded only in the resume and job description.</CardDescription>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={resetMatch} className="border-foreground/10 hover:bg-foreground/5">
-                      <RotateCcw className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                      Reset Results
-                    </Button>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void exportMatchReport()}
+                        disabled={exportingMatch}
+                        className="border-foreground/10 hover:bg-foreground/5"
+                      >
+                        {exportingMatch ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                        )}
+                        Export Report
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={resetMatch} className="border-foreground/10 hover:bg-foreground/5">
+                        <RotateCcw className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                        Reset Results
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {matchResult.recruiterSummary ? (

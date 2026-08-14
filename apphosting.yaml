@@ -1,7 +1,37 @@
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
 
+# Runtime configuration of the Next.js server.
 runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+
+# Environment variables injected into the Next.js server (and build).
+#
+# GEMINI_API_KEY is a server-side secret referenced from Cloud Secret
+# Manager — it is never committed and never shipped to the browser.
+# Create the secret before deploying:
+#   firebase functions:secrets:set GEMINI_API_KEY
+#
+# The NEXT_PUBLIC_FIREBASE_* values are the public Firebase Web App
+# configuration for project "hirefit-ai". They are inlined into the client
+# bundle by design (the same values live in the Firebase console SDK
+# snippet) and must be present at build time.
+env:
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyDcrC8Bl0rJhqTp8ASaFUgN8wiVfLe47eo"
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "hirefit-ai.firebaseapp.com"
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "hirefit-ai"
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "hirefit-ai.firebasestorage.app"
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "313890942440"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:313890942440:web:9de492d6ea9565c921085d"
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-527HYLNWJL"

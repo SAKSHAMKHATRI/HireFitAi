@@ -25,6 +25,17 @@ export type AnalysisMeta = {
    * contact details they do not want persisted before passing it here.
    */
   result?: unknown
+  /**
+   * Id of the source resume analysis record this AI Match was computed
+   * against. Lets the Resume Analyzer restore the correct match next to the
+   * analysis it belongs to (instead of guessing by timestamp).
+   */
+  analysisId?: string
+  /**
+   * The job description used for an AI Match, persisted so the analyzer can
+   * restore it alongside the match result after a page refresh.
+   */
+  jobDescription?: string
 }
 
 /** Normalizes any analytics event into a flat, admin-friendly record. */
@@ -87,27 +98,32 @@ function toAnalysisPayload(event: AnalyticsEvent): Record<string, unknown> {
 
 /**
  * Persists an analytics event to the `analyses` collection for the current
- * user. Resolves silently when there is no signed-in user; rejects when the
- * Firestore write itself fails (callers should treat rejection as non-fatal).
+ * user. Resolves with the created record id, or null when there is no
+ * signed-in user; rejects when the Firestore write itself fails (callers
+ * should treat rejection as non-fatal). The record id lets the Resume
+ * Analyzer link AI Match results back to their source analysis.
  */
 export async function persistAnalysisEvent(
   event: AnalyticsEvent,
   meta?: AnalysisMeta
-): Promise<void> {
+): Promise<string | null> {
   const currentUser = auth.currentUser
-  if (!currentUser) return
+  if (!currentUser) return null
 
   const fallbackName =
     (currentUser.email ?? "").split("@")[0].replace(/[._-]+/g, " ").trim() || "HireFit User"
 
-  await addDoc(collection(db, "analyses"), {
+  const docRef = await addDoc(collection(db, "analyses"), {
     userId: currentUser.uid,
     userName: currentUser.displayName?.trim() || fallbackName,
     userEmail: currentUser.email ?? "",
     type: event.type,
     fileName: meta?.fileName ?? null,
     createdAt: event.timestamp,
+    ...(meta?.analysisId ? { analysisId: meta.analysisId } : {}),
+    ...(meta?.jobDescription ? { jobDescription: meta.jobDescription } : {}),
     ...(meta?.result !== undefined ? { result: meta.result } : {}),
     ...toAnalysisPayload(event),
   })
+  return docRef.id
 }

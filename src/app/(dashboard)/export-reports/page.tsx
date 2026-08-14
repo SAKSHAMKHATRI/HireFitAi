@@ -30,6 +30,15 @@ import {
   type AnalyticsEvent,
 } from "@/lib/analytics"
 import { withTimeout } from "@/lib/resume-upload"
+import { auth } from "@/lib/firebase"
+import { fetchMyJobMatches, fetchMyResumeAnalyses } from "@/lib/firebase-firestore"
+import { selectMatchRecordForAnalysis } from "@/lib/match-selection"
+import {
+  buildMatchReportMarkdown,
+  extractCandidateName,
+  normalizeMatchResult,
+  type NormalizedMatch,
+} from "@/lib/match-report"
 
 type SavedLetter = {
   letter: string
@@ -49,6 +58,14 @@ type SavedProgress = {
 }
 
 type CoachMessage = { role: "user" | "assistant"; content: string }
+
+type MatchReportData = {
+  match: NormalizedMatch
+  candidateName?: string
+  jobDescription?: string
+  analysisDate?: number
+  matchDate?: number
+}
 
 function buildReportMarkdown(
   events: AnalyticsEvent[],
@@ -163,6 +180,9 @@ export default function ExportReportsPage() {
   const [savedProgress, setSavedProgress] = useState<SavedProgress | null>(null)
   const [coachHistory, setCoachHistory] = useState<CoachMessage[]>([])
   const [exporting, setExporting] = useState<"docx" | "pdf" | "copy" | null>(null)
+  const [matchReport, setMatchReport] = useState<MatchReportData | null>(null)
+  const [matchLoading, setMatchLoading] = useState(true)
+  const [matchExporting, setMatchExporting] = useState(false)
 
   useEffect(() => {
     setEvents(loadAnalytics())
@@ -181,12 +201,76 @@ export default function ExportReportsPage() {
     }
   }, [])
 
+  // Load the user's latest AI Match result (owner-scoped) so it can be
+  // exported here too. Best-effort: the rest of the page works without it.
+  useEffect(() => {
+    const uid = auth.currentUser?.uid
+    if (!uid) {
+      setMatchLoading(false)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const [analyses, matches] = await Promise.all([
+          fetchMyResumeAnalyses(uid),
+          fetchMyJobMatches(uid),
+        ])
+        if (cancelled) return
+        const latestAnalysis =
+          analyses.find((record) => record.result !== undefined) ?? null
+        const linked = selectMatchRecordForAnalysis(matches, latestAnalysis)
+        if (linked) {
+          const match = normalizeMatchResult(linked.result)
+          if (match) {
+            setMatchReport({
+              match,
+              candidateName: extractCandidateName(latestAnalysis?.result),
+              jobDescription:
+                typeof linked.jobDescription === "string"
+                  ? linked.jobDescription
+                  : undefined,
+              analysisDate: latestAnalysis?.createdAt ?? undefined,
+              matchDate: linked.createdAt ?? undefined,
+            })
+          }
+        }
+      } catch {
+        // Best-effort — the export page still works for other report types.
+      } finally {
+        if (!cancelled) setMatchLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const markdown = useMemo(
     () => buildReportMarkdown(events, savedLetter, savedProgress, coachHistory),
     [events, savedLetter, savedProgress, coachHistory]
   )
 
-  const hasContent = events.length > 0 || Boolean(savedLetter) || Boolean(savedProgress) || coachHistory.length > 0
+  const matchMarkdown = useMemo(
+    () =>
+      matchReport
+        ? buildMatchReportMarkdown(matchReport.match, {
+            candidateName: matchReport.candidateName,
+            jobDescription: matchReport.jobDescription,
+            analysisDate: matchReport.analysisDate,
+            matchDate: matchReport.matchDate,
+          })
+        : "",
+    [matchReport]
+  )
+
+  const hasContent =
+    events.length > 0 ||
+    Boolean(savedLetter) ||
+    Boolean(savedProgress) ||
+    coachHistory.length > 0 ||
+    matchLoading ||
+    matchReport !== null
 
   // Print-only styles so "Download PDF" prints just the report.
   useEffect(() => {
@@ -246,6 +330,56 @@ export default function ExportReportsPage() {
     }, 250)
   }
 
+  const downloadMatchDocx = async () => {
+    if (!matchReport || matchExporting) return
+    setMatchExporting(true)
+    try {
+      const response = await withTimeout(
+        fetch("/api/reports/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markdown: matchMarkdown, filename: "hirefit-match-report" }),
+        }),
+        30000,
+        "Report export timed out. Please try again."
+      )
+      if (!response.ok) throw new Error("Export failed")
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "hirefit-match-report.docx"
+      link.click()
+      URL.revokeObjectURL(url)
+      toast({ title: "Match report exported", description: "Your match report was downloaded as a Word document." })
+    } catch {
+      toast({
+        title: "Export failed",
+        description: "Could not create the DOCX file. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setMatchExporting(false)
+    }
+  }
+
+  const copyMatchReport = async () => {
+    if (!matchReport || matchExporting) return
+    setMatchExporting(true)
+    try {
+      await navigator.clipboard.writeText(matchMarkdown)
+      toast({ title: "Match report copied", description: "Your match report was copied to the clipboard." })
+    } catch {
+      toast({
+        title: "Could not copy",
+        description: "Your browser blocked clipboard access.",
+        variant: "destructive",
+      })
+    } finally {
+      setMatchExporting(false)
+    }
+  }
+
   const copyReport = async () => {
     if (!hasContent) return
     setExporting("copy")
@@ -300,6 +434,7 @@ export default function ExportReportsPage() {
               {savedLetter ? <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">Cover letter</Badge> : null}
               {savedProgress ? <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">Interview</Badge> : null}
               {coachHistory.length > 0 ? <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">Coach chat</Badge> : null}
+              {matchReport ? <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">Match report</Badge> : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="outline" size="sm" onClick={copyReport} disabled={exporting !== null} className="border-foreground/10 hover:bg-foreground/5">
@@ -326,6 +461,69 @@ export default function ExportReportsPage() {
               <FileText className="h-5 w-5 text-primary" strokeWidth={1.5} />
             </CardHeader>
           </Card>
+
+          {/* Full Match Report — latest AI Match result, owner-scoped */}
+          {matchLoading ? (
+            <Card className="glass-card">
+              <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" strokeWidth={1.5} />
+                Loading your latest match report...
+              </CardContent>
+            </Card>
+          ) : matchReport ? (
+            <Card className="glass-card">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-sm font-headline tracking-widest uppercase">Full Match Report</CardTitle>
+                  <CardDescription>
+                    Your latest AI Match result — exportable as a Word document.
+                    {matchReport.candidateName ? ` Candidate: ${matchReport.candidateName}.` : ""}
+                  </CardDescription>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void copyMatchReport()}
+                    disabled={matchExporting}
+                    className="border-foreground/10 hover:bg-foreground/5"
+                  >
+                    {matchExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ClipboardCopy className="mr-2 h-4 w-4" strokeWidth={1.5} />}
+                    Copy
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void downloadMatchDocx()}
+                    disabled={matchExporting}
+                    className="font-headline"
+                  >
+                    {matchExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" strokeWidth={1.5} />}
+                    Download DOCX
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-4">
+                  <p className="text-[10px] font-headline uppercase tracking-widest text-muted-foreground">Match Score</p>
+                  <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-primary">{matchReport.match.matchScore}%</p>
+                </div>
+                <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-4">
+                  <p className="text-[10px] font-headline uppercase tracking-widest text-muted-foreground">ATS Compatibility</p>
+                  <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-primary">{matchReport.match.atsCompatibility}%</p>
+                </div>
+                <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-4">
+                  <p className="text-[10px] font-headline uppercase tracking-widest text-muted-foreground">Matched Skills</p>
+                  <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-green-500">{matchReport.match.matchedSkills.length}</p>
+                </div>
+                <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-4">
+                  <p className="text-[10px] font-headline uppercase tracking-widest text-muted-foreground">Missing Skills</p>
+                  <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-yellow-400">{matchReport.match.missingSkills.length}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card className="glass-card" id="export-report">
             <CardContent>
