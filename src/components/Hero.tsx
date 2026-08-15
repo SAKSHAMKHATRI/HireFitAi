@@ -6,13 +6,6 @@ import { motion } from "motion/react"
 import { useState, type FormEvent } from "react"
 import { LandingSections } from "@/components/LandingSections"
 import { useAuth } from "@/components/auth/auth-provider"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 
 const videoUrl =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260603_132049_036591b8-6e92-4760-b94c-a7ea6eef315c.mp4"
@@ -52,7 +45,6 @@ export function Hero() {
   const router = useRouter()
   const { isAuthenticated, requireAuth } = useAuth()
   const [question, setQuestion] = useState("")
-  const [demoOpen, setDemoOpen] = useState(false)
   const dashboardHref = isAuthenticated ? "/dashboard" : "/login?next=%2Fdashboard"
 
   const askAssistant = (event?: FormEvent) => {
@@ -109,13 +101,6 @@ export function Hero() {
                 <Link href={dashboardHref} className="rounded-full bg-brand-green px-6 py-3 text-sm font-semibold text-black shadow-[0_18px_45px_rgba(106,154,0,0.35)] transition-transform hover:-translate-y-0.5">
                   Analyze Resume →
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => setDemoOpen(true)}
-                  className="rounded-full border border-black/10 bg-white/90 px-6 py-3 text-sm font-medium text-zinc-900 shadow-sm backdrop-blur-xl transition-transform hover:-translate-y-0.5"
-                >
-                  Watch Demo
-                </button>
                 <span className="w-full text-sm font-medium text-zinc-700 sm:w-auto">✓ No Credit Card Required</span>
               </div>
 
@@ -152,23 +137,6 @@ export function Hero() {
         <div className="absolute bottom-6 left-8 md:left-12 z-10 text-xs font-medium tracking-wide text-zinc-700">HireFit AI · 2026</div>
         <div className="absolute bottom-6 right-8 md:right-12 z-10 text-xs font-medium tracking-wide text-zinc-700">AI career intelligence</div>
       </section>
-
-      <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
-        <DialogContent className="border border-black/10 bg-[#EDEEF5] text-zinc-950 sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl font-semibold">HireFit AI in action</DialogTitle>
-            <DialogDescription className="text-zinc-600">
-              A quick look at the HireFit AI experience — from resume analysis to interview prep.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="overflow-hidden rounded-2xl border border-black/10 bg-black">
-            <video src={videoUrl} controls autoPlay playsInline className="aspect-video w-full" />
-          </div>
-          <p className="text-center text-xs text-zinc-500">
-            Then sign in to try it yourself — resume analysis, ATS matching, interviews, and more.
-          </p>
-        </DialogContent>
-      </Dialog>
 
       <LandingSections />
     </>
