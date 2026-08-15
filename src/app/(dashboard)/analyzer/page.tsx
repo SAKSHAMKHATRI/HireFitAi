@@ -1005,7 +1005,7 @@ export default function AnalyzerPage() {
                 {analysis.candidateInfo.location ? (
                   <ContactRow icon={MapPin} value={analysis.candidateInfo.location} />
                 ) : null}
-                {analysis.candidateInfo.links.map((link) => (
+                {[...new Set(analysis.candidateInfo.links)].map((link) => (
                   <a
                     key={link}
                     href={link.startsWith("http") ? link : `https://${link}`}
