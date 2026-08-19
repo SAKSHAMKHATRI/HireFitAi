@@ -7,6 +7,7 @@ HireFit AI is an intelligent career platform that helps job seekers analyze thei
 The platform combines resume analysis, ATS scoring, job-description matching, personalized recommendations, and report generation into a single application.
 
 ---
+Live Demo : https://hire-fit-ai-snowy.vercel.app/
 
 ## 🚀 Features
 
